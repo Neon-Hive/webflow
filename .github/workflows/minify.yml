@@ -21,15 +21,21 @@ jobs:
         run: |
           npm install -g uglify-js csso-cli
 
-      # Minify all JavaScript files in the repository
+      # Minify all JavaScript files in the repository and create .min.js files
       - name: Minify JavaScript files
         run: |
-          find . -name '*.js' -exec uglifyjs --compress --mangle -o {} -- {} \;
+          find . -name '*.js' -not -name '*.min.js' | while read jsfile; do
+            minfile="${jsfile%.js}.min.js"
+            uglifyjs "$jsfile" --compress --mangle -o "$minfile"
+          done
 
-      # Minify all CSS files in the repository
+      # Minify all CSS files in the repository and create .min.css files
       - name: Minify CSS files
         run: |
-          find . -name '*.css' -exec csso --input {} --output {} \;
+          find . -name '*.css' -not -name '*.min.css' | while read cssfile; do
+            minfile="${cssfile%.css}.min.css"
+            csso "$cssfile" --output "$minfile"
+          done
 
       # Commit the changes if there are any
       - name: Commit and push changes
@@ -37,6 +43,6 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add .
-          git commit -m "Minify all JavaScript and CSS files"
+          git commit -m "Minified JS and CSS files"
           git push
         if: success()
