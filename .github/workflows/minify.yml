@@ -1,0 +1,42 @@
+name: Minify All JavaScript and CSS Files
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  minify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Install necessary minification tools
+      - name: Install Minification Tools
+        run: |
+          npm install -g uglify-js csso-cli
+
+      # Minify all JavaScript files in the repository
+      - name: Minify JavaScript files
+        run: |
+          find . -name '*.js' -exec uglifyjs --compress --mangle -o {} -- {} \;
+
+      # Minify all CSS files in the repository
+      - name: Minify CSS files
+        run: |
+          find . -name '*.css' -exec csso --input {} --output {} \;
+
+      # Commit the changes if there are any
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add .
+          git commit -m "Minify all JavaScript and CSS files"
+          git push
+        if: success()
