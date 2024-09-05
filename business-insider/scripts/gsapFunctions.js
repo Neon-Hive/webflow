@@ -196,7 +196,7 @@ pageFunctions.addFunction(
     //       }
     //     });
     //   }
-    // }
+    }
 
     // Function to handle GSAP animations for heading lines
     function gsapHeadingLines() {
