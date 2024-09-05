@@ -156,47 +156,47 @@ pageFunctions.addFunction(
       // Select all elements with the data attribute data-animation-hover=text-char
       const buttonTextChars = document.querySelectorAll("[data-animation-hover=text-char]");
 
-      if (buttonTextChars.length > 0) {
-        buttonTextChars.forEach(function (buttonElement) {
-          const textOne = buttonElement.querySelectorAll("[data-animation-selector=button-text1] .char");
-          const textTwo = buttonElement.querySelectorAll("[data-animation-selector=button-text2] .char");
+    //   if (buttonTextChars.length > 0) {
+    //     buttonTextChars.forEach(function (buttonElement) {
+    //       const textOne = buttonElement.querySelectorAll("[data-animation-selector=button-text1] .char");
+    //       const textTwo = buttonElement.querySelectorAll("[data-animation-selector=button-text2] .char");
 
-          if (textOne.length > 0 && textTwo.length > 0) {
-            let tlButtonTextChar = gsap.timeline({ paused: true });
+    //       if (textOne.length > 0 && textTwo.length > 0) {
+    //         let tlButtonTextChar = gsap.timeline({ paused: true });
 
-            tlButtonTextChar.to(textOne, {
-              translateY: "-50%",
-              rotationY: "-5.7deg",
-              rotationX: "-90deg",
-              stagger: { each: 0.02 },
-              ease: "power3.inOut",
-              duration: 0.5,
-            });
+    //         tlButtonTextChar.to(textOne, {
+    //           translateY: "-50%",
+    //           rotationY: "-5.7deg",
+    //           rotationX: "-90deg",
+    //           stagger: { each: 0.02 },
+    //           ease: "power3.inOut",
+    //           duration: 0.5,
+    //         });
 
-            tlButtonTextChar.from(
-              textTwo,
-              {
-                translateY: "50%",
-                rotationY: "5.7deg",
-                rotationX: "90deg",
-                stagger: { each: 0.02 },
-                ease: "power3.inOut",
-                duration: 0.5,
-              },
-              0.1
-            );
+    //         tlButtonTextChar.from(
+    //           textTwo,
+    //           {
+    //             translateY: "50%",
+    //             rotationY: "5.7deg",
+    //             rotationX: "90deg",
+    //             stagger: { each: 0.02 },
+    //             ease: "power3.inOut",
+    //             duration: 0.5,
+    //           },
+    //           0.1
+    //         );
 
-            buttonElement.addEventListener("mouseenter", function () {
-              tlButtonTextChar.restart();
-            });
+    //         buttonElement.addEventListener("mouseenter", function () {
+    //           tlButtonTextChar.restart();
+    //         });
 
-            buttonElement.addEventListener("mouseleave", function () {
-              tlButtonTextChar.reverse();
-            });
-          }
-        });
-      }
-    }
+    //         buttonElement.addEventListener("mouseleave", function () {
+    //           tlButtonTextChar.reverse();
+    //         });
+    //       }
+    //     });
+    //   }
+    // }
 
     // Function to handle GSAP animations for heading lines
     function gsapHeadingLines() {
@@ -233,7 +233,7 @@ pageFunctions.addFunction(
     // Function to set up the splits
     function setupSplit() {
       typeSplit = new SplitType("[data-split='true']", {
-        types: "lines, words, chars",
+        types: "lines, words",
         tagName: "span",
       });
 
