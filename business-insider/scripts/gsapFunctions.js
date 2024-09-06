@@ -130,7 +130,7 @@ function () {
   // Function to set up the splits for lines and words
   function setupSplit() {
     typeSplit = new SplitType("[data-split='true']", {
-      types: "lines, words",
+      types: "lines",
       tagName: "span",
     });
 
