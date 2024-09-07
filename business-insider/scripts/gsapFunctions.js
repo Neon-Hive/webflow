@@ -6,13 +6,13 @@
 * GSAP Easings ===========================================
 */
 pageFunctions.addFunction("gsapCreateEase", function () {
-  // Register CustomEase plugin
-  gsap.registerPlugin(CustomEase);
+// Register CustomEase plugin
+gsap.registerPlugin(CustomEase);
 
-  // Create custom easing functions
-  CustomEase.create("inOutCubic", "0.645, 0.045, 0.355, 1");
-  CustomEase.create("inOutQuint", "0.86, 0, 0.07, 1");
-  CustomEase.create("circOut", "0.23, 1, 0.32, 1");
+// Create custom easing functions
+CustomEase.create("inOutCubic", "0.645, 0.045, 0.355, 1");
+CustomEase.create("inOutQuint", "0.86, 0, 0.07, 1");
+CustomEase.create("circOut", "0.23, 1, 0.32, 1");
 });
 
 /*
@@ -20,7 +20,9 @@ pageFunctions.addFunction("gsapCreateEase", function () {
 */
 pageFunctions.addFunction(
   "splitType",
-  function () {
+  function () 
+
+  {
     // First, target all items with [data-split-rich=true]
     document.querySelectorAll("[data-split-rich='true']").forEach((richText) => {
       // Find all headings inside these rich text elements and add the data-split=true attribute
@@ -29,9 +31,6 @@ pageFunctions.addFunction(
       });
     });
 
-    // Define typeSplit and typeSplitChar variables outside setupSplit functions
-    let typeSplit;
-    let typeSplitChar;
 
     function gsapButtonHover() {
       // Select all elements with the data attribute data-animation-hover=main-hover
@@ -95,6 +94,8 @@ pageFunctions.addFunction(
       }
     }
 
+    gsapButtonHover();
+
     // Function to handle GSAP animations for heading lines
     function gsapHeadingLines() {
       gsap.registerPlugin(ScrollTrigger);
@@ -126,6 +127,9 @@ pageFunctions.addFunction(
         });
       }
     }
+
+    // Define typeSplit and typeSplitChar variables outside setupSplit functions
+    let typeSplit;
 
     // Function to set up the splits for lines and words
     function setupSplit() {
@@ -164,7 +168,6 @@ pageFunctions.addFunction(
 
             tlButtonTextChar.to(textOne, {
               translateY: "-50%",
-              rotationY: "-5.7deg",
               rotationX: "-90deg",
               stagger: { each: 0.02 },
               ease: "power3.inOut",
@@ -175,7 +178,6 @@ pageFunctions.addFunction(
               textTwo,
               {
                 translateY: "50%",
-                rotationY: "5.7deg",
                 rotationX: "90deg",
                 stagger: { each: 0.02 },
                 ease: "power3.inOut",
@@ -195,6 +197,8 @@ pageFunctions.addFunction(
         });
       }
     }
+
+    let typeSplitChar;
 
     // Function to set up the splits for characters
     function setupSplitChar() {
@@ -229,75 +233,74 @@ pageFunctions.addFunction(
   "font-loaded"
 );
 
-
 /*
 * GSAP Clip Image ===========================================
 */
 pageFunctions.addFunction("gsapClipImage", function () {
-  let centerImageReveal = document.querySelectorAll("[data-animation=center-image-reveal]");
-  let horizontalImageReveal = document.querySelectorAll("[data-animation=horizontal-image-reveal]");
-  let verticalImageReveal = document.querySelectorAll("[data-animation=vertical-image-reveal]");
+let centerImageReveal = document.querySelectorAll("[data-animation=center-image-reveal]");
+let horizontalImageReveal = document.querySelectorAll("[data-animation=horizontal-image-reveal]");
+let verticalImageReveal = document.querySelectorAll("[data-animation=vertical-image-reveal]");
 
-  // Center Image Reveal Animation
-  if (centerImageReveal.length > 0) {
-    centerImageReveal.forEach(function (element) {
-      let tlCenterImageReveal = gsap.timeline();
+// Center Image Reveal Animation
+if (centerImageReveal.length > 0) {
+  centerImageReveal.forEach(function (element) {
+    let tlCenterImageReveal = gsap.timeline();
 
-      tlCenterImageReveal.fromTo(
-        element,
-        { clipPath: "polygon(30% 0%, 70% 0%, 70% 100%, 30% 100%)" },
-        { clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)" }
-      );
+    tlCenterImageReveal.fromTo(
+      element,
+      { clipPath: "polygon(30% 0%, 70% 0%, 70% 100%, 30% 100%)" },
+      { clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)" }
+    );
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        end: "bottom 95%",
-        scrub: true,
-        animation: tlCenterImageReveal,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      end: "bottom 95%",
+      scrub: true,
+      animation: tlCenterImageReveal,
     });
-  }
+  });
+}
 
-  // Horizontal Image Reveal Animation
-  if (horizontalImageReveal.length > 0) {
-    horizontalImageReveal.forEach(function (element) {
-      let tlHorizontalImageReveal = gsap.timeline();
+// Horizontal Image Reveal Animation
+if (horizontalImageReveal.length > 0) {
+  horizontalImageReveal.forEach(function (element) {
+    let tlHorizontalImageReveal = gsap.timeline();
 
-      tlHorizontalImageReveal.fromTo(
-        element,
-        { clipPath: "polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)" },
-        { clipPath: "polygon(100% 0%, 0% 0%, 0% 100%, 100% 100%)", duration: 1.3, ease: "inOutCubic" }
-      );
+    tlHorizontalImageReveal.fromTo(
+      element,
+      { clipPath: "polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)" },
+      { clipPath: "polygon(100% 0%, 0% 0%, 0% 100%, 100% 100%)", duration: 1.3, ease: "inOutCubic" }
+    );
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlHorizontalImageReveal,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlHorizontalImageReveal,
     });
-  }
+  });
+}
 
-  // Vertical Image Reveal Animation
-  if (verticalImageReveal.length > 0) {
-    verticalImageReveal.forEach(function (element) {
-      let tlVerticalImageReveal = gsap.timeline();
+// Vertical Image Reveal Animation
+if (verticalImageReveal.length > 0) {
+  verticalImageReveal.forEach(function (element) {
+    let tlVerticalImageReveal = gsap.timeline();
 
-      tlVerticalImageReveal.fromTo(
-        element,
-        { clipPath: "polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%)" },
-        { clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)", duration: 1.3, ease: "inOutCubic" }
-      );
+    tlVerticalImageReveal.fromTo(
+      element,
+      { clipPath: "polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%)" },
+      { clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)", duration: 1.3, ease: "inOutCubic" }
+    );
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlVerticalImageReveal,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlVerticalImageReveal,
     });
-  }
+  });
+}
 });
 
 
@@ -305,133 +308,133 @@ pageFunctions.addFunction("gsapClipImage", function () {
 * GSAP Divider Line ===========================================
 */
 pageFunctions.addFunction("gsapDividerLine", function () {
-  let dividerLineH = document.querySelectorAll("[data-animation=horizontal-divider-line]");
-  let dividerLineHSmall = document.querySelectorAll("[data-animation=horizontal-divider-line-small]");
-  let dividerLineV = document.querySelectorAll("[data-animation=vertical-divider-line]");
-  let dividerLineVSmall = document.querySelectorAll("[data-animation=vertical-divider-line-small]");
+let dividerLineH = document.querySelectorAll("[data-animation=horizontal-divider-line]");
+let dividerLineHSmall = document.querySelectorAll("[data-animation=horizontal-divider-line-small]");
+let dividerLineV = document.querySelectorAll("[data-animation=vertical-divider-line]");
+let dividerLineVSmall = document.querySelectorAll("[data-animation=vertical-divider-line-small]");
 
-  // Vertical Divider Lines Animation
-  if (dividerLineV.length > 0) {
-    dividerLineV.forEach(function (element) {
-      let tlDividerLineV = gsap.timeline();
+// Vertical Divider Lines Animation
+if (dividerLineV.length > 0) {
+  dividerLineV.forEach(function (element) {
+    let tlDividerLineV = gsap.timeline();
 
-      tlDividerLineV.from(element, { height: "0%", duration: 1.3, ease: "inOutQuint" });
+    tlDividerLineV.from(element, { height: "0%", duration: 1.3, ease: "inOutQuint" });
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlDividerLineV,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlDividerLineV,
     });
-  }
+  });
+}
 
-  // Small Vertical Divider Lines Animation
-  if (dividerLineVSmall.length > 0) {
-    dividerLineVSmall.forEach(function (element) {
-      let tlDividerLineVSmall = gsap.timeline();
+// Small Vertical Divider Lines Animation
+if (dividerLineVSmall.length > 0) {
+  dividerLineVSmall.forEach(function (element) {
+    let tlDividerLineVSmall = gsap.timeline();
 
-      tlDividerLineVSmall.from(element, { height: "0%", duration: 0.8, ease: "inOutQuint" });
+    tlDividerLineVSmall.from(element, { height: "0%", duration: 0.8, ease: "inOutQuint" });
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlDividerLineVSmall,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlDividerLineVSmall,
     });
-  }
+  });
+}
 
-  // Horizontal Divider Lines Animation
-  if (dividerLineH.length > 0) {
-    dividerLineH.forEach(function (element) {
-      let tlDividerLineH = gsap.timeline();
+// Horizontal Divider Lines Animation
+if (dividerLineH.length > 0) {
+  dividerLineH.forEach(function (element) {
+    let tlDividerLineH = gsap.timeline();
 
-      tlDividerLineH.from(element, { width: "0%", duration: 1.3, ease: "inOutQuint" });
+    tlDividerLineH.from(element, { width: "0%", duration: 1.3, ease: "inOutQuint" });
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlDividerLineH,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlDividerLineH,
     });
-  }
+  });
+}
 
-  // Small Horizontal Divider Lines Animation
-  if (dividerLineHSmall.length > 0) {
-    dividerLineHSmall.forEach(function (element) {
-      let tlDividerLineHSmall = gsap.timeline();
+// Small Horizontal Divider Lines Animation
+if (dividerLineHSmall.length > 0) {
+  dividerLineHSmall.forEach(function (element) {
+    let tlDividerLineHSmall = gsap.timeline();
 
-      tlDividerLineHSmall.from(element, { width: "0%", duration: 0.8, ease: "inOutQuint" });
+    tlDividerLineHSmall.from(element, { width: "0%", duration: 0.8, ease: "inOutQuint" });
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlDividerLineHSmall,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlDividerLineHSmall,
     });
-  }
+  });
+}
 });
 
 /*
 * GSAP Element In View ===========================================
 */
 pageFunctions.addFunction("gsapElementInView", function () {
-  let elementInView = document.querySelectorAll("[data-animation=in-view]");
-  let elementScale = document.querySelectorAll("[data-animation=scale]");
+let elementInView = document.querySelectorAll("[data-animation=in-view]");
+let elementScale = document.querySelectorAll("[data-animation=scale]");
 
-  if (elementInView.length > 0) {
-    elementInView.forEach(function (element) {
-      let tlElementInView = gsap.timeline({ paused: true });
+if (elementInView.length > 0) {
+  elementInView.forEach(function (element) {
+    let tlElementInView = gsap.timeline({ paused: true });
 
-      tlElementInView.from(element, { opacity: 0, duration: 1, ease: "inOutCubic" });
+    tlElementInView.from(element, { opacity: 0, duration: 1, ease: "inOutCubic" });
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlElementInView,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlElementInView,
     });
-  }
+  });
+}
 
-  if (elementScale.length > 0) {
-    elementScale.forEach(function (element) {
-      let tlElementScale = gsap.timeline({ paused: true });
+if (elementScale.length > 0) {
+  elementScale.forEach(function (element) {
+    let tlElementScale = gsap.timeline({ paused: true });
 
-      tlElementScale.from(element, { scale: 0, duration: 1, ease: "inOutQuint" });
+    tlElementScale.from(element, { scale: 0, duration: 1, ease: "inOutQuint" });
 
-      ScrollTrigger.create({
-        trigger: element,
-        start: "top 95%",
-        toggleActions: "play none none none",
-        animation: tlElementScale,
-      });
+    ScrollTrigger.create({
+      trigger: element,
+      start: "top 95%",
+      toggleActions: "play none none none",
+      animation: tlElementScale,
     });
-  }
+  });
+}
 });
 
 /*
 * Aria attribute adder ===========================================
 */
 pageFunctions.addFunction("setAria", function () {
-  const mm = gsap.matchMedia();
+const mm = gsap.matchMedia();
 
-  // Option 1: Add attributes on desktop only
-  mm.add("(min-width: 992px)", () => {
-    document.querySelectorAll("[data-aria='desktop']").forEach((el) => {
-      el.setAttribute("aria-hidden", "true");
-      el.setAttribute("tabindex", "-1");
-    });
+// Option 1: Add attributes on desktop only
+mm.add("(min-width: 992px)", () => {
+  document.querySelectorAll("[data-aria='desktop']").forEach((el) => {
+    el.setAttribute("aria-hidden", "true");
+    el.setAttribute("tabindex", "-1");
   });
+});
 
-  // Option 2: Add attributes on Tablet and smaller screens
-  mm.add("(max-width: 991px)", () => {
-    document.querySelectorAll("[data-aria='tablet']").forEach((el) => {
-      el.setAttribute("aria-hidden", "true");
-      el.setAttribute("tabindex", "-1");
-    });
+// Option 2: Add attributes on Tablet and smaller screens
+mm.add("(max-width: 991px)", () => {
+  document.querySelectorAll("[data-aria='tablet']").forEach((el) => {
+    el.setAttribute("aria-hidden", "true");
+    el.setAttribute("tabindex", "-1");
   });
+});
 });
