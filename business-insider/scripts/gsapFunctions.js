@@ -144,7 +144,6 @@ function () {
 
     // After setting up the split, re-initialize GSAP animations
     gsapHeadingLines();
-    gsapButtonHover();
   }
 
   // Initial setup of splits
