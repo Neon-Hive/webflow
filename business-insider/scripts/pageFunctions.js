@@ -13,13 +13,13 @@
         this.functions[id] = fn;
         this.dependencies[id] = dependencies;
         this.requirements[id] = requirement;
-        console.log(`Function ${id} added with dependencies:`, dependencies, "and requirement:", requirement);
+        // console.log(`Function ${id} added with dependencies:`, dependencies, "and requirement:", requirement);
       }
     },
     executeFunctions: function () {
       if (this.added) return;
       this.added = true;
-      console.log("Starting function execution...");
+      // console.log("Starting function execution...");
 
       const executeWithDependencies = (id) => {
         if (this.executed[id]) return;
@@ -39,7 +39,7 @@
         // Handle requirement for font loading
         if (requirement === "font-loaded") {
           if (document.fonts.status !== "loaded") {
-            console.log(`Delaying execution of function ${id} until fonts are loaded.`);
+            // console.log(`Delaying execution of function ${id} until fonts are loaded.`);
             document.fonts.ready.then(() => {
               executeWithDependencies(id);
             });
@@ -48,11 +48,11 @@
         }
 
         try {
-          console.log(`Executing function ${id}`);
+          // console.log(`Executing function ${id}`);
           this.functions[id]();
           this.executed[id] = true;
         } catch (e) {
-          console.error(`Error executing function ${id}:`, e);
+          // console.error(`Error executing function ${id}:`, e);
         }
       };
 
@@ -60,7 +60,7 @@
         executeWithDependencies(id);
       }
 
-      console.log("Function execution completed.");
+      // console.log("Function execution completed.");
     },
   };
 })(window);
