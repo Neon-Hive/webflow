@@ -514,6 +514,83 @@ pageFunctions.addFunction("setAria", function () {
     });
   });
 
+  pageFunctions.addFunction('customCursor', function() {
+    // Function for checking the type of device
+    function deviceType() {
+      const ua = navigator.userAgent;
+      if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+        return "tablet";
+      } else if (
+        /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(
+          ua
+        )
+      ) {
+        return "mobile";
+      }
+      return "desktop";
+    }
+
+    // Cursor dot & text effect
+    function nhCursor() {
+      const nh_cursor = document.getElementById("cursor-wrap");
+      const cursor_dot = document.getElementById("cursor-dot");
+      const cursor_text = document.getElementById("cursor-text");
+      const targetElements = document.querySelectorAll("[data-cursor='true']");
+
+      // Follow the pointer with smooth movement
+      window.addEventListener("pointermove", (event) => {
+        gsap.to(nh_cursor, {
+          x: event.clientX,
+          y: event.clientY,
+          duration: 0.4,
+          ease: "power1.out",
+          scale: 1,
+        });
+      });
+
+      // Handle hover effects on targeted elements
+      targetElements.forEach((e) => {
+        // console.log("Target element found: ", e);
+
+        e.addEventListener("mouseenter", () => {
+          const customText = e.getAttribute("data-cursor-text");
+          // console.log("Element hovered, custom text: ", customText);
+
+          cursor_text.textContent = customText || ""; // Set custom text if available
+          cursor_text.classList.add("show");
+          cursor_dot.classList.add("active");
+        });
+
+        e.addEventListener("mouseleave", () => {
+          // console.log("Element left, removing text and active states.");
+
+          cursor_text.classList.remove("show");
+          cursor_dot.classList.remove("active");
+          cursor_text.textContent = ""; // Clear text on leave
+        });
+      });
+
+      // Instantly set the cursor position (helps avoid lag)
+      document.addEventListener("pointermove", (event) => {
+        gsap.set(nh_cursor, { x: event.clientX, y: event.clientY });
+      });
+
+      // Hide the cursor when the mouse leaves the document
+      document.addEventListener("mouseleave", () => {
+        gsap.to(nh_cursor, { duration: 0.4, ease: "power1.in", scale: 0 });
+      });
+    }
+
+    // Implement cursor, smooth scroll, and parallax effect based on the type of device
+    if (deviceType() === "desktop") {
+      // console.log("Device type: desktop, initializing cursor.");
+      nhCursor();
+    } else {
+      // console.log("Device is not desktop, hiding cursor.");
+      document.getElementById("cursor-wrap").style.display = "none";
+    }
+  });
+
 function refreshScrollTrigger() {
   ScrollTrigger.refresh();
 }
