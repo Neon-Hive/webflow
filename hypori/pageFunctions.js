@@ -501,6 +501,19 @@ pageFunctions.addFunction("setAria", function () {
   });
 });
 
+  pageFunctions.addFunction('copyrightYear', function() {
+    // Get the current year
+    const currentYear = new Date().getFullYear();
+
+    // Select all elements with the class 'copyright-year'
+    const copyrightYearElements = document.querySelectorAll('.copyright-year');
+
+    // Update the text content of each selected element to the current year
+    copyrightYearElements.forEach(function (element) {
+      element.textContent = currentYear;
+    });
+  });
+
 function refreshScrollTrigger() {
   ScrollTrigger.refresh();
 }
