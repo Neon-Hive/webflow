@@ -343,6 +343,19 @@ pageFunctions.addFunction("navigationOpenState", function () {
   }
 });
 
+pageFunctions.addFunction("navDropdownLink", function () {
+  $(document).on("click", ".nav_component .g_clickable-link", function () {
+    if (window.innerWidth < 992) {
+      console.log("Clicked .g_clickable-link:", this);
+
+      const menuButton = $('[data-attribute="navigation-menu-button"]');
+      console.log("Menu Button:", menuButton[0]);
+
+      menuButton.click();
+    }
+  });
+});
+
 pageFunctions.addFunction("pixelBurst", function () {
   let burst = document.querySelectorAll("[data-attribute=burst]");
   burst.forEach(function (mainElement) {
@@ -501,130 +514,324 @@ pageFunctions.addFunction("setAria", function () {
   });
 });
 
-  pageFunctions.addFunction('copyrightYear', function() {
-    // Get the current year
-    const currentYear = new Date().getFullYear();
+pageFunctions.addFunction("copyrightYear", function () {
+  // Get the current year
+  const currentYear = new Date().getFullYear();
 
-    // Select all elements with the class 'copyright-year'
-    const copyrightYearElements = document.querySelectorAll('.copyright-year');
+  // Select all elements with the class 'copyright-year'
+  const copyrightYearElements = document.querySelectorAll(".copyright-year");
 
-    // Update the text content of each selected element to the current year
-    copyrightYearElements.forEach(function (element) {
-      element.textContent = currentYear;
+  // Update the text content of each selected element to the current year
+  copyrightYearElements.forEach(function (element) {
+    element.textContent = currentYear;
+  });
+});
+
+pageFunctions.addFunction("customCursor", function () {
+  // Function for checking the type of device
+  function deviceType() {
+    const ua = navigator.userAgent;
+    if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+      return "tablet";
+    } else if (
+      /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(
+        ua
+      )
+    ) {
+      return "mobile";
+    }
+    return "desktop";
+  }
+
+  // Cursor dot & text effect
+  function nhCursor() {
+    const nh_cursor = document.getElementById("cursor-wrap");
+    const cursor_dot = document.getElementById("cursor-dot");
+    const cursor_text = document.getElementById("cursor-text");
+    const targetElements = document.querySelectorAll("[data-cursor='true']");
+
+    // Follow the pointer with smooth movement
+    window.addEventListener("pointermove", (event) => {
+      gsap.to(nh_cursor, {
+        x: event.clientX,
+        y: event.clientY,
+        duration: 0.4,
+        ease: "power1.out",
+        scale: 1,
+      });
+    });
+
+    // Handle hover effects on targeted elements
+    targetElements.forEach((e) => {
+      // console.log("Target element found: ", e);
+
+      e.addEventListener("mouseenter", () => {
+        const customText = e.getAttribute("data-cursor-text");
+        // console.log("Element hovered, custom text: ", customText);
+
+        cursor_text.textContent = customText || ""; // Set custom text if available
+        cursor_text.classList.add("show");
+        cursor_dot.classList.add("active");
+      });
+
+      e.addEventListener("mouseleave", () => {
+        // console.log("Element left, removing text and active states.");
+
+        cursor_text.classList.remove("show");
+        cursor_dot.classList.remove("active");
+        cursor_text.textContent = ""; // Clear text on leave
+      });
+    });
+
+    // Instantly set the cursor position (helps avoid lag)
+    document.addEventListener("pointermove", (event) => {
+      gsap.set(nh_cursor, { x: event.clientX, y: event.clientY });
+    });
+
+    // Hide the cursor when the mouse leaves the document
+    document.addEventListener("mouseleave", () => {
+      gsap.to(nh_cursor, { duration: 0.4, ease: "power1.in", scale: 0 });
+    });
+  }
+
+  // Implement cursor, smooth scroll, and parallax effect based on the type of device
+  if (deviceType() === "desktop") {
+    // console.log("Device type: desktop, initializing cursor.");
+    nhCursor();
+  } else {
+    // console.log("Device is not desktop, hiding cursor.");
+    document.getElementById("cursor-wrap").style.display = "none";
+  }
+});
+
+pageFunctions.addFunction("responsiveScrollTrigger", function () {
+  function refreshScrollTrigger() {
+    ScrollTrigger.refresh();
+  }
+
+  // Initialize lastWidth and lastHeight
+  let lastWidth = document.documentElement.clientWidth;
+  let lastHeight = document.documentElement.clientHeight;
+
+  // Debounce function
+  function debounce(func, delay) {
+    let timer;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => func.apply(this, args), delay);
+    };
+  }
+
+  // Check dimensions
+  function checkDimensions() {
+    let newWidth = document.documentElement.clientWidth;
+    let newHeight = document.documentElement.clientHeight;
+
+    if (newWidth !== lastWidth || newHeight !== lastHeight) {
+      refreshScrollTrigger();
+      lastWidth = newWidth;
+      lastHeight = newHeight;
+    }
+  }
+
+  const debouncedCheck = debounce(checkDimensions, 300);
+  setInterval(debouncedCheck, 300);
+
+  const searchInput = document.querySelector(".g-filters_search-secondary");
+
+  if (searchInput) {
+    searchInput.addEventListener("input", debounce(refreshScrollTrigger, 200));
+  }
+});
+
+pageFunctions.addFunction("eventsDate", function () {
+  function updateEventDates() {
+    // Select all event elements
+    const eventElements = document.querySelectorAll("[data-attribute='event']");
+
+    eventElements.forEach((eventElement) => {
+      // Find date and time elements inside each event
+      const dateElement = eventElement.querySelector("[data-attribute='date']");
+      const timeElement = eventElement.querySelector("[data-attribute='time']");
+
+      if (dateElement && timeElement) {
+        const dateValue = new Date(dateElement.textContent);
+        const now = new Date();
+
+        // Calculate the difference in time and convert to days
+        const diffTime = dateValue - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        let timeText = "";
+
+        if (diffDays > 0) {
+          timeText = `${diffDays} day${diffDays > 1 ? "s" : ""} away`;
+        } else if (diffDays === 0) {
+          timeText = "Today";
+        } else {
+          timeText = `${Math.abs(diffDays)} day${
+            Math.abs(diffDays) > 1 ? "s" : ""
+          } ago`;
+        }
+
+        // Update the time element with the calculated time text
+        timeElement.textContent = timeText;
+      }
+    });
+  }
+
+  // Run the update function on initial load
+  updateEventDates();
+
+  // Add event listener to rerun the function when pagination button is clicked
+  const paginationButtons = document.querySelectorAll(
+    "[data-pagination-button]"
+  );
+  paginationButtons.forEach((button) => {
+    button.addEventListener("click", updateEventDates);
+  });
+});
+
+pageFunctions.addFunction("industriesScroll", function () {
+  const lists = $(".h-industries_content-list");
+  const items = $(".h-industries_content-item");
+  const visuals = $(".h-industries_visual-list .h-industries_visual-item");
+
+  // Set up GSAP matchMedia for desktop only (min-width: 992px)
+  gsap.matchMedia().add("(min-width: 992px)", () => {
+    // Remove 'is-active' from all items and visuals, then add to the first of each
+    items.removeClass("is-active");
+    visuals.removeClass("is-active");
+    lists.each(function () {
+      $(this).find(".h-industries_content-item").first().addClass("is-active");
+    });
+    visuals.first().addClass("is-active");
+
+    // ScrollTrigger to toggle 'is-active' for content items and sync visuals
+    items.each(function (index) {
+      const item = $(this);
+      const correspondingVisual = visuals.eq(index); // Get the visual item with matching index
+
+      ScrollTrigger.create({
+        trigger: item,
+        start: "top center",
+        end: "bottom center",
+        onEnter: () => {
+          items.removeClass("is-active");
+          visuals.removeClass("is-active");
+          item.addClass("is-active");
+          correspondingVisual.addClass("is-active");
+        },
+        onEnterBack: () => {
+          items.removeClass("is-active");
+          visuals.removeClass("is-active");
+          item.addClass("is-active");
+          correspondingVisual.addClass("is-active");
+        },
+        onLeave: () => {
+          // Skip onLeave for the first and last items
+          if (index !== 0 && index !== items.length - 1) {
+            item.removeClass("is-active");
+            correspondingVisual.removeClass("is-active");
+          }
+        },
+        onLeaveBack: () => {
+          // Skip onLeaveBack for the first and last items
+          if (index !== 0 && index !== items.length - 1) {
+            item.removeClass("is-active");
+            correspondingVisual.removeClass("is-active");
+          }
+        },
+      });
     });
   });
+});
 
-  pageFunctions.addFunction('customCursor', function() {
-    // Function for checking the type of device
-    function deviceType() {
-      const ua = navigator.userAgent;
-      if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
-        return "tablet";
-      } else if (
-        /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(
-          ua
-        )
-      ) {
-        return "mobile";
-      }
-      return "desktop";
-    }
+pageFunctions.addFunction("breadcrumbLine", function () {
+  // Save all breadcrumb lines in a variable
+  const breadcrumbLines = $("[data-breadcrumb-line]");
 
-    // Cursor dot & text effect
-    function nhCursor() {
-      const nh_cursor = document.getElementById("cursor-wrap");
-      const cursor_dot = document.getElementById("cursor-dot");
-      const cursor_text = document.getElementById("cursor-text");
-      const targetElements = document.querySelectorAll("[data-cursor='true']");
+  // Define URL arrays for each breadcrumb type
+  const productURLs = ["/how-it-work"];
+  const solutionsURLs = ["/solutions"];
+  const industriesURLs = ["/industries"];
+  const companyURLs = [
+    "/about-us",
+    "/partners",
+    "/resources/news-and-media",
+    "/news-and-media",
+  ];
+  const resourcesURLs = ["/blog", "/faq", "/events", , "/users"];
+  const contactURLs = ["/contact", "/contact#support"];
 
-      // Follow the pointer with smooth movement
-      window.addEventListener("pointermove", (event) => {
-        gsap.to(nh_cursor, {
-          x: event.clientX,
-          y: event.clientY,
-          duration: 0.4,
-          ease: "power1.out",
-          scale: 1,
-        });
-      });
-
-      // Handle hover effects on targeted elements
-      targetElements.forEach((e) => {
-        // console.log("Target element found: ", e);
-
-        e.addEventListener("mouseenter", () => {
-          const customText = e.getAttribute("data-cursor-text");
-          // console.log("Element hovered, custom text: ", customText);
-
-          cursor_text.textContent = customText || ""; // Set custom text if available
-          cursor_text.classList.add("show");
-          cursor_dot.classList.add("active");
-        });
-
-        e.addEventListener("mouseleave", () => {
-          // console.log("Element left, removing text and active states.");
-
-          cursor_text.classList.remove("show");
-          cursor_dot.classList.remove("active");
-          cursor_text.textContent = ""; // Clear text on leave
-        });
-      });
-
-      // Instantly set the cursor position (helps avoid lag)
-      document.addEventListener("pointermove", (event) => {
-        gsap.set(nh_cursor, { x: event.clientX, y: event.clientY });
-      });
-
-      // Hide the cursor when the mouse leaves the document
-      document.addEventListener("mouseleave", () => {
-        gsap.to(nh_cursor, { duration: 0.4, ease: "power1.in", scale: 0 });
-      });
-    }
-
-    // Implement cursor, smooth scroll, and parallax effect based on the type of device
-    if (deviceType() === "desktop") {
-      // console.log("Device type: desktop, initializing cursor.");
-      nhCursor();
+  // Helper function to activate matching breadcrumb line
+  function activateLine(urlArray, line) {
+    if (urlArray.some((path) => window.location.pathname.includes(path))) {
+      line.addClass("is-active");
     } else {
-      // console.log("Device is not desktop, hiding cursor.");
-      document.getElementById("cursor-wrap").style.display = "none";
+      line.removeClass("is-active");
+    }
+  }
+
+  // Iterate over each breadcrumb line and activate if URL matches
+  breadcrumbLines.each(function () {
+    const line = $(this);
+    const lineType = line.data("breadcrumb-line"); // Get the line's type from the attribute
+
+    // Check URL and activate the corresponding line
+    if (lineType === "products") {
+      activateLine(productURLs, line);
+    } else if (lineType === "solutions") {
+      activateLine(solutionsURLs, line);
+    } else if (lineType === "industries") {
+      activateLine(industriesURLs, line);
+    } else if (lineType === "company") {
+      activateLine(companyURLs, line);
+    } else if (lineType === "resources") {
+      activateLine(resourcesURLs, line);
+    } else if (lineType === "contact") {
+      activateLine(contactURLs, line);
     }
   });
+});
 
-function refreshScrollTrigger() {
-  ScrollTrigger.refresh();
-}
+pageFunctions.addFunction("buttonTextHover", function () {
+  // Apply animation only for screens wider than 992px
+  gsap.matchMedia().add("(min-width: 992px)", () => {
+    // Select all elements with [data-hover=button-text]
+    const buttonTextElements = document.querySelectorAll(
+      "[data-button=hover-text]"
+    );
+    buttonTextElements.forEach((buttonText) => {
+      // Find the [data-hover=button-line] inside each buttonText element
+      const buttonLine = buttonText.querySelector("[data-hover=button-line]");
 
-// Initialize lastWidth and lastHeight
-let lastWidth = document.documentElement.clientWidth;
-let lastHeight = document.documentElement.clientHeight;
+      if (buttonLine) {
+        // Set initial position for the line (off-screen to the left)
+        gsap.set(buttonLine, { x: "-100%" });
 
-// Debounce function
-function debounce(func, delay) {
-  let timer;
-  return function (...args) {
-    clearTimeout(timer);
-    timer = setTimeout(() => func.apply(this, args), delay);
-  };
-}
+        // Slide in on mouse enter
+        buttonText.addEventListener("mouseenter", () => {
+          gsap.to(buttonLine, {
+            x: "0%",
+            duration: 0.6,
+            ease: "inOutQuint",
+          });
+        });
 
-// Check dimensions
-function checkDimensions() {
-  let newWidth = document.documentElement.clientWidth;
-  let newHeight = document.documentElement.clientHeight;
-
-  if (newWidth !== lastWidth || newHeight !== lastHeight) {
-    refreshScrollTrigger();
-    lastWidth = newWidth;
-    lastHeight = newHeight;
-  }
-}
-
-const debouncedCheck = debounce(checkDimensions, 300);
-setInterval(debouncedCheck, 300);
-
-const searchInput = document.querySelector(".g-filters_search-secondary");
-
-if (searchInput) {
-  searchInput.addEventListener("input", debounce(refreshScrollTrigger, 200));
-}
+        // Slide out on mouse leave
+        buttonText.addEventListener("mouseleave", () => {
+          gsap.to(buttonLine, {
+            x: "100%",
+            duration: 0.6,
+            ease: "circOut",
+            onComplete: () => {
+              // Reset position to -100% after the animation completes
+              gsap.set(buttonLine, { x: "-100%" });
+            },
+          });
+        });
+      }
+    });
+  });
+});
