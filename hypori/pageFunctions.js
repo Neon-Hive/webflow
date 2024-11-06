@@ -1,5 +1,6 @@
 gsap.registerPlugin(ScrollTrigger);
 gsap.registerPlugin(CustomEase);
+gsap.registerPlugin(MotionPathPlugin);
 
 pageFunctions.addFunction("gsapCreateEase", function () {
   // Create custom easing functions
@@ -834,4 +835,36 @@ pageFunctions.addFunction("buttonTextHover", function () {
       }
     });
   });
+});
+
+pageFunctions.addFunction("drawSvg", function () {
+  // Create a timeline with looping, back-and-forth motion, and delay at the end
+  const tl = gsap.timeline({
+    repeat: -1, // Infinite looping
+    yoyo: true, // Reverse back to start
+    ease: "none",
+    repeatDelay: 1, // Delay for 1 second at the end of each loop
+  });
+
+  // Define the motion path animation
+  tl.to("#movingLine", {
+    duration: 15, // Duration of the full journey along the path
+    motionPath: {
+      path: "#largeSvgPath",
+      align: "#largeSvgPath",
+      autoRotate: true,
+      alignOrigin: [0.5, 0.5],
+    },
+  });
+
+  // Opacity transition over the first 30% of the path
+  tl.fromTo(
+    "#movingLine",
+    { opacity: 0 }, // Start at 0% opacity
+    { opacity: 0.5, duration: 1.5 }, // Fade to 50% opacity over the first 30% of the path
+    0
+  );
+
+  // Transition to full opacity after 30%
+  tl.to("#movingLine", { opacity: 1, duration: 0.5 }, 1.5); // 1.5s mark aligns with the first 30% duration
 });
