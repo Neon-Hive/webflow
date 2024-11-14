@@ -369,3 +369,45 @@ pageFunctions.addFunction("copyrightYear", function () {
     element.textContent = currentYear;
   });
 });
+
+pageFunctions.addFunction("responsiveScrollTrigger", function () {
+  function refreshScrollTrigger() {
+    ScrollTrigger.refresh();
+  }
+
+  let lastWidth = document.documentElement.clientWidth;
+  let lastHeight = document.documentElement.clientHeight;
+
+  function debounce(func, delay) {
+    let timer;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => func.apply(this, args), delay);
+    };
+  }
+
+  function checkDimensions() {
+    let newWidth = document.documentElement.clientWidth;
+    let newHeight = document.documentElement.clientHeight;
+    if (newWidth !== lastWidth || newHeight !== lastHeight) {
+      refreshScrollTrigger();
+      lastWidth = newWidth;
+      lastHeight = newHeight;
+    }
+  }
+
+  const debouncedCheck = debounce(checkDimensions, 300);
+  setInterval(debouncedCheck, 300);
+
+  // Refresh on search input with debounce
+  const searchInput = document.querySelector("[data-attribute=search]");
+  if (searchInput) {
+    searchInput.addEventListener("input", debounce(refreshScrollTrigger, 200));
+  }
+
+  // Refresh on filter change immediately for radio buttons
+  const filterElements = document.querySelectorAll("[data-attribute=filter]");
+  filterElements.forEach((filterElement) => {
+    filterElement.addEventListener("change", refreshScrollTrigger);
+  });
+});
