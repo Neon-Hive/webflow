@@ -442,7 +442,6 @@ async function initMap() {
     const radioButtons = document.querySelectorAll('#map-radio-filters input[type="radio"]');
     const container = document.getElementById("location-list");
     const items = Array.from(container.getElementsByClassName("studio_nearby-item"));
-    console.log(items);
 
     radioButtons.forEach(function (radioButton) {
       radioButton.addEventListener("change", function () {
