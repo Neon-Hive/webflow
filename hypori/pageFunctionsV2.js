@@ -244,9 +244,9 @@ pageFunctions.addFunction("gsapSeparateAnimation", function () {
     let tlSeparate = gsap.timeline({ ease: "inOutCubic" });
 
     if (direction === "left" && item1) {
-      tlSeparate.from(item1, { width: "5%", duration: duration });
+      tlSeparate.from(item1, { width: "5%", willChange: "width", duration: duration });
     } else if (direction === "right" && item2) {
-      tlSeparate.from(item2, { width: "5%", duration: duration });
+      tlSeparate.from(item2, { width: "5%", willChange: "width", duration: duration });
     }
 
     ScrollTrigger.create({
