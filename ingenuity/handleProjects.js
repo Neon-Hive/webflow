@@ -21,6 +21,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Update each card with project details
   projectCards.forEach((card, index) => {
     const project = randomProjects[index];
+    if (!project) return; // Skip if there's no project for this card
+
     const titleElement = card.querySelector("h3");
     const imgElement = card.querySelector("img");
     const linkElement = card.querySelector("a");
