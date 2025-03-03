@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Get the current project path (e.g. "/projects/siren-x1")
   const currentProjectPath = window.location.pathname;
 
+    console.log("discoverMoreProjects", discoverMoreProjects);
+  
   // Filter out the current project
   const availableProjects = discoverMoreProjects.filter((project) => project.link !== currentProjectPath);
 
