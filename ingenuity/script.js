@@ -753,130 +753,130 @@ pageFunctions.addFunction('globalDropdown', function () {
 });
 
 // // PageTransition
-// pageFunctions.addFunction("pageTransition", function () {
+pageFunctions.addFunction("pageTransition", function () {
 
-//   // Define reusable variables for elements
-//   const headerText = document.querySelectorAll("[data-animation='header-text']");
-//   const navComponent = document.querySelector("[data-animation='nav-component']");
-//   const headerFade = document.querySelectorAll("[data-animation='header-fade']");
-//   const headerNext = document.querySelector("[data-animation='header-next']");
+  // Define reusable variables for elements
+  const headerText = document.querySelectorAll("[data-animation='header-text']");
+  const navComponent = document.querySelector("[data-animation='nav-component']");
+  const headerFade = document.querySelectorAll("[data-animation='header-fade']");
+  const headerNext = document.querySelector("[data-animation='header-next']");
 
-//   // General page load transition with global or page-specific animation
-//   let tl = gsap.timeline();
+  // General page load transition with global or page-specific animation
+  let tl = gsap.timeline();
 
-//   tl.to(".transition_wrap", { opacity: 0, delay: 0.2, duration: 1, ease: "power1.out" })
-//     .set(".transition_wrap", { display: "none" })
-//     .add(() => {
-//       runAnimation("-=0.6");
-//     });
+  tl.to(".transition_wrap", { opacity: 0, delay: 0.2, duration: 1, ease: "power1.out" })
+    .set(".transition_wrap", { display: "none" })
+    .add(() => {
+      runAnimation("-=0.6");
+    });
 
-//   // Function to determine which animation to run
-//   function runAnimation() {
-//     const pageName = $("body").data("page");
+  // Function to determine which animation to run
+  function runAnimation() {
+    const pageName = $("body").data("page");
 
-//     if (!pageName) {
-//       runGlobalAnimation();
-//     } else {
-//       switch (pageName) {
-//       case "process":
-//         runProcessPageAnimation();
-//         break;
-//       case "about":
-//         runAboutPageAnimation();
-//         break;
-//       }
-//     }
-//   }
+    if (!pageName) {
+      runGlobalAnimation();
+    } else {
+      switch (pageName) {
+      case "process":
+        runProcessPageAnimation();
+        break;
+      case "about":
+        runAboutPageAnimation();
+        break;
+      }
+    }
+  }
 
-//   // Global animation
-//   function runGlobalAnimation() {
-//     let tl = gsap.timeline();
+  // Global animation
+  function runGlobalAnimation() {
+    let tl = gsap.timeline();
 
-//     // Ensure visibility for headerText
-//     if (headerText.length > 0) {
-//       headerText.forEach(header => {
-//         gsap.set(header, { visibility: "visible" });
-//         tl.from(header.querySelectorAll(".line"), {
-//           y: "1rem",
-//           willChange: "transform, opacity",
-//           opacity: 0,
-//           ease: "inOutCubic",
-//           duration: 1.2,
-//           stagger: { each: 0.2 },
-//         });
-//       });
-//     }
+    // Ensure visibility for headerText
+    if (headerText.length > 0) {
+      headerText.forEach(header => {
+        gsap.set(header, { visibility: "visible" });
+        tl.from(header.querySelectorAll(".line"), {
+          y: "1rem",
+          willChange: "transform, opacity",
+          opacity: 0,
+          ease: "inOutCubic",
+          duration: 1.2,
+          stagger: { each: 0.2 },
+        });
+      });
+    }
 
-//     // Ensure visibility for navComponent
-//     if (navComponent) {
-//       gsap.set(navComponent, { visibility: "visible" });
-//       tl.fromTo(
-//         navComponent, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" },
-//         "<"
-//       );
-//     }
+    // Ensure visibility for navComponent
+    if (navComponent) {
+      gsap.set(navComponent, { visibility: "visible" });
+      tl.fromTo(
+        navComponent, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" },
+        "<"
+      );
+    }
 
-//     // Ensure visibility for headerFade
-//     if (headerFade.length > 0) {
-//       gsap.set(headerFade, { visibility: "visible" });
-//       tl.fromTo(
-//         headerFade, { opacity: 0 }, {
-//           opacity: 1,
-//           duration: 0.6,
-//           stagger: 0.2,
-//           ease: "power1.out"
-//         },
-//         "-=0.2"
-//       );
-//     }
+    // Ensure visibility for headerFade
+    if (headerFade.length > 0) {
+      gsap.set(headerFade, { visibility: "visible" });
+      tl.fromTo(
+        headerFade, { opacity: 0 }, {
+          opacity: 1,
+          duration: 0.6,
+          stagger: 0.2,
+          ease: "power1.out"
+        },
+        "-=0.2"
+      );
+    }
 
-//     // Ensure visibility for headerNext
-//     if (headerNext) {
-//       gsap.set(headerNext, { visibility: "visible" });
-//       tl.fromTo(
-//         headerNext, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" },
-//         "-=0.2"
-//       );
-//     }
-//   }
+    // Ensure visibility for headerNext
+    if (headerNext) {
+      gsap.set(headerNext, { visibility: "visible" });
+      tl.fromTo(
+        headerNext, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" },
+        "-=0.2"
+      );
+    }
+  }
 
-//   // Page-specific animation for Process page
-//   function runProcessPageAnimation() {
-//     // Empty as per request
-//   }
+  // Page-specific animation for Process page
+  function runProcessPageAnimation() {
+    // Empty as per request
+  }
 
-//   // Page-specific animation for About page
-//   function runAboutPageAnimation() {
-//     // Empty as per request
-//   }
+  // Page-specific animation for About page
+  function runAboutPageAnimation() {
+    // Empty as per request
+  }
 
-//   // Triggering transition on link clicks
-//   $("a:not(.excluded-class)").on("click", function (e) {
-//     let currentUrl = $(this).attr("href");
-//     if (
-//       $(this).prop("hostname") === window.location.host &&
-//       !currentUrl.includes("#") &&
-//       $(this).attr("target") !== "_blank"
-//     ) {
-//       e.preventDefault();
+  // Triggering transition on link clicks
+  $("a:not(.excluded-class)").on("click", function (e) {
+    let currentUrl = $(this).attr("href");
+    if (
+      $(this).prop("hostname") === window.location.host &&
+      !currentUrl.includes("#") &&
+      $(this).attr("target") !== "_blank"
+    ) {
+      e.preventDefault();
 
-//       let tl = gsap.timeline({ onComplete: () => (window.location.href = currentUrl) });
-//       tl.set(".transition_wrap", { display: "flex" })
-//         .fromTo(".transition_wrap", { opacity: 0 }, {
-//           opacity: 1,
-//           duration: 0.6,
-//           ease: "power1.out"
-//         });
-//     }
-//   });
+      let tl = gsap.timeline({ onComplete: () => (window.location.href = currentUrl) });
+      tl.set(".transition_wrap", { display: "flex" })
+        .fromTo(".transition_wrap", { opacity: 0 }, {
+          opacity: 1,
+          duration: 0.6,
+          ease: "power1.out"
+        });
+    }
+  });
 
-//   // Handle back button with a page refresh to ensure correct state
-//   window.onpageshow = function (event) {
-//     if (event.persisted) {
-//       window.location.reload();
-//     }
-//   };
-// });
+  // Handle back button with a page refresh to ensure correct state
+  window.onpageshow = function (event) {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  };
+});
 
 // Global Animation
 pageFunctions.addFunction("globalAnimation", function () {
