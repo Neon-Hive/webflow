@@ -754,6 +754,13 @@ pageFunctions.addFunction('globalDropdown', function () {
 
 // PageTransition
 pageFunctions.addFunction("pageTransition", function () {
+  // Check if we're in the Webflow Editor - if so, don't run transitions
+  if (window.Webflow && window.Webflow.env('editor')) {
+    console.log('Webflow editor detected - page transitions disabled');
+    gsap.set(".transition_wrap", {display: "none" });
+    gsap.set(["[data-animation=header-text]", "[data-animation=header-fade]", "[data-animation=header-next]"], {visibility: "visible"})
+    return;
+  }
 
   // Define reusable variables for elements
   const headerText = document.querySelectorAll("[data-animation='header-text']");
@@ -764,10 +771,10 @@ pageFunctions.addFunction("pageTransition", function () {
   // General page load transition with global or page-specific animation
   let tl = gsap.timeline();
 
-  tl.to(".transition_wrap", { yPercent: -100, delay: 0.2, duration: 0.6, ease: "power4.out" })
+  tl.to(".transition_wrap", { yPercent: -100, delay: 0.2, duration: 0.8, ease: "inOutCubic" })
     .set(".transition_wrap", { display: "none" })
     .add(() => {
-      runAnimation("-=0.6");
+      runAnimation("-=0.2");
     });
 
   // Function to determine which animation to run
@@ -793,7 +800,7 @@ pageFunctions.addFunction("pageTransition", function () {
     let tl = gsap.timeline();
 
     // Ensure visibility for headerText
-    if (headerText.length > 0) {
+    if (headerText) {
       headerText.forEach(header => {
         gsap.set(header, { visibility: "visible" });
         tl.from(header.querySelectorAll(".line"), {
@@ -817,7 +824,7 @@ pageFunctions.addFunction("pageTransition", function () {
     }
 
     // Ensure visibility for headerFade
-    if (headerFade.length > 0) {
+    if (headerFade) {
       gsap.set(headerFade, { visibility: "visible" });
       tl.fromTo(
         headerFade, { opacity: 0 }, {
@@ -840,16 +847,6 @@ pageFunctions.addFunction("pageTransition", function () {
     }
   }
 
-  // Page-specific animation for Process page
-  function runProcessPageAnimation() {
-    // Empty as per request
-  }
-
-  // Page-specific animation for About page
-  function runAboutPageAnimation() {
-    // Empty as per request
-  }
-
   // Triggering transition on link clicks
   $("a:not(.excluded-class)").on("click", function (e) {
     let currentUrl = $(this).attr("href");
@@ -862,10 +859,10 @@ pageFunctions.addFunction("pageTransition", function () {
 
       let tl = gsap.timeline({ onComplete: () => (window.location.href = currentUrl) });
       tl.set(".transition_wrap", { display: "flex" })
-        .fromTo(".transition_wrap", { yPercent: 100 }, {
-          yPercent: -100,
+        .fromTo(".transition_wrap", {yPercent: 100 }, {
+          yPercent: 0,
           duration: 0.6,
-          ease: "power4.out"
+          ease: "inOutCubic"
         });
     }
   });
@@ -1517,72 +1514,6 @@ pageFunctions.addFunction("lazyVideo", function () {
   }
 });
 
-// Refresh ScrollTriggers
-// pageFunctions.addFunction("responsiveScrollTrigger", function () {
-//   function refreshScrollTrigger() {
-//     ScrollTrigger.refresh();
-//   }
-
-//   // Initialize lastWidth and lastHeight
-//   let lastWidth = document.documentElement.clientWidth;
-//   let lastHeight = document.documentElement.clientHeight;
-
-//   // Debounce function
-//   function debounce(func, delay) {
-//     let timer;
-//     return function (...args) {
-//       clearTimeout(timer);
-//       timer = setTimeout(() => func.apply(this, args), delay);
-//     };
-//   }
-
-//   // Check dimensions
-//   function checkDimensions() {
-//     let newWidth = document.documentElement.clientWidth;
-//     let newHeight = document.documentElement.clientHeight;
-
-//     if (newWidth !== lastWidth || newHeight !== lastHeight) {
-//       refreshScrollTrigger();
-//       lastWidth = newWidth;
-//       lastHeight = newHeight;
-//     }
-//   }
-
-//   const debouncedCheck = debounce(checkDimensions, 300);
-//   setInterval(debouncedCheck, 300);
-
-//   // Refresh ScrollTrigger on search input
-//   const searchInput = document.querySelector("[filter-search]");
-//   if (searchInput) {
-//     searchInput.addEventListener("input", debounce(refreshScrollTrigger, 200));
-//   }
-
-//   // Refresh ScrollTrigger on radio button change
-//   const filterElement = document.querySelector("[fs-cmsfilter-element=filters]");
-//   if (filterElement) {
-//     const radioButtons = filterElement.querySelectorAll("input[type=radio]");
-//     radioButtons.forEach((radio) => {
-//       radio.addEventListener("change", refreshScrollTrigger);
-//     });
-//   }
-
-//   window.fsAttributes = window.fsAttributes || [];
-//   window.fsAttributes.push([
-//     'cmsload',
-//     (listInstances) => {
-//       refreshScrollTrigger();
-//     },
-//   ]);
-
-//   window.fsAttributes = window.fsAttributes || [];
-//   window.fsAttributes.push([
-//     'cmsnest',
-//     (listInstances) => {
-//       refreshScrollTrigger();
-//     },
-//   ]);
-
-// });
 pageFunctions.addFunction("responsiveScrollTrigger", function () {
   // Single debounce function for reuse
   const debounce = (func, delay) => {
