@@ -1,5 +1,120 @@
+// Handle locationData from cms load. Needed to get more than 100+ items
+window.fsAttributes = window.fsAttributes || [];
+window.locationData = window.locationData || [];
+
+// Wait for FinSweet CMS Load to finish loading nest & filter
+window.fsAttributes.push([
+  "cmsload",
+  (cmsLoadInstances) => {
+    window.fsAttributes.cmsnest.init().then(() => {
+      console.log("CMS Nest successfully initialized!");
+
+      // Hide all skeleton wrappers once loading is complete
+      document.querySelectorAll(".locations_loading-wrapper").forEach((wrapper) => {
+        wrapper.style.display = "none";
+      });
+
+      // Hide all skeleton wrappers once loading is complete - handle location list in map code
+      document.querySelectorAll(".n4_loading-skeleton:not(.is-location-item)").forEach((wrapper) => {
+        wrapper.style.display = "none";
+      });
+
+      // Show all CMS locations once loading is complete
+      document.querySelectorAll(".locations_nest").forEach((location) => {
+        location.style.display = "";
+      });
+
+      console.log("CMS Nest loading complete.");
+    });
+
+    // Listen for loaded event on each cms load instance
+    cmsLoadInstances.forEach((instance) => {
+      instance.on("loaded", () => {
+        addItemsToLocationData();
+      });
+    });
+
+    // Run once on initial load
+    addItemsToLocationData();
+  },
+]);
+
+function addItemsToLocationData() {
+  const fallbackUrl = "https://cdn.prod.website-files.com/67ab6f4970b90367b528f15a/67aecfc6a895ff8fabea7a46_Staffing%20Support.webp";
+  const invalidPlaceholder = "https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg";
+
+  document.querySelectorAll(".location_block_result_item_wrap").forEach((item) => {
+    const name = item.getAttribute("data-name");
+
+    if (!locationData.some((entry) => entry.name === name)) {
+      let imageUrl = item.querySelector("img")?.getAttribute("src") || "";
+
+      // Ensure the fallback image is applied if imageUrl is empty or is the webflow placeholder
+      if (!imageUrl || imageUrl.trim() === "" || imageUrl === invalidPlaceholder) {
+        imageUrl = fallbackUrl;
+      }
+
+      locationData.push({
+        name: name,
+        lat: parseFloat(item.getAttribute("data-lat")) || 0,
+        lng: parseFloat(item.getAttribute("data-lng")) || 0,
+        imageUrl: imageUrl,
+        link: item.getAttribute("data-link") ? `/location/${item.getAttribute("data-link")}` : "",
+        country: item.getAttribute("data-country") || "",
+        state: item.getAttribute("data-state") || "",
+        city: item.getAttribute("data-city") || "",
+        postcodes: item.getAttribute("data-postcode") || "",
+      });
+    }
+  });
+  console.log("Updated locationData:", locationData);
+
+  // Dispatch a custom event to signal that locationData is ready
+  window.dispatchEvent(new Event("locationDataLoaded"));
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   window.userLocation = null; // Ensure global variable exists
+
+  // Handle nesting load states for FinSweet
+  const loadingWrappers = document.querySelectorAll(".locations_loading-wrapper");
+  const cmsLocations = document.querySelectorAll(".locations_nest");
+
+  cmsLocations.forEach((location) => {
+    location.style.display = "none";
+  });
+
+  // Loop through each loading wrapper and append 10 skeletons
+  loadingWrappers.forEach((wrapper) => {
+    for (let i = 0; i < 10; i++) {
+      const skeleton = document.createElement("div");
+      skeleton.classList.add("n4-locations_loading-skeleton");
+      wrapper.appendChild(skeleton);
+    }
+  });
+
+  // Function to initialize the map once location data is available
+  async function initMapWhenReady() {
+    if (window.locationData.length > 0) {
+      console.log("✅ Location data available, initializing map...");
+      await initMap();
+      checkForLocationInURL();
+    } else {
+      console.log("⏳ Waiting for location data before initializing map...");
+      window.addEventListener(
+        "locationDataLoaded",
+        async () => {
+          console.log("📍 locationData is now loaded, initializing map...");
+          await initMap();
+          checkForLocationInURL();
+        },
+        { once: true }
+      ); // Ensure this runs only once
+    }
+  }
+
+  // Call function to wait for location data before initializing map
+  initMapWhenReady();
 
   // Ensure Google Maps API is fully loaded (for geocoding fallback)
   async function loadGoogleMapsAPI() {
@@ -275,8 +390,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  window.updateMarkersList = updateMarkersList; // Make this function available globally
-
   async function initMap(mapElemId = "map_canvas") {
     // Request needed libraries.
     const { Map, Marker } = await google.maps.importLibrary("maps");
@@ -320,16 +433,12 @@ document.addEventListener("DOMContentLoaded", function () {
       anchor: new google.maps.Point(25, 60),
     };
 
-    // Fallback image URL if not provided
-    const fallbackUrl = "https://cdn.prod.website-files.com/67ab6f4970b90367b528f15a/67aecfc6a895ff8fabea7a46_Staffing%20Support.webp";
-
     let markers = [];
     let bounds = new google.maps.LatLngBounds();
     const infoWindow = new google.maps.InfoWindow();
 
     // Add markers dynamically from locationData source & store in a new array with distance and fallback image
     locationData.forEach((location) => {
-      const imageUrl = location.imageUrl && location.imageUrl.trim() !== "" ? location.imageUrl : fallbackUrl;
       let distance = null;
 
       if (userLocation) {
@@ -346,7 +455,7 @@ document.addEventListener("DOMContentLoaded", function () {
       marker.extraData = {
         name: location.name,
         link: location.link,
-        imageUrl: imageUrl,
+        imageUrl: location.imageUrl,
         distance: distance,
         country: location.country,
         state: location.state,
@@ -359,7 +468,7 @@ document.addEventListener("DOMContentLoaded", function () {
           <div style="max-width: 250px;">
             <div class="u-vflex-stretch-center u-gap-3">
               <div style="overflow: hidden; border-radius: .75rem;">
-                <img style="max-height: 8rem; aspect-ratio: 16 / 9; object-position: 0% 50%;" src="${imageUrl}" alt="${location.name}">
+                <img style="max-height: 8rem; aspect-ratio: 16 / 9; object-position: 0% 50%;" src="${location.imageUrl}" alt="${location.name}">
               </div>
                 <div>
                   <h4 class="location_hero_item_heading u-text-style-large">${location.name}</h4>
@@ -389,6 +498,16 @@ document.addEventListener("DOMContentLoaded", function () {
     // Make markers available globally
     window.markers = markers;
     console.log("Markers added successfully.");
+
+    // Fallback if markers ARE available and nesting is slow, show map and locations immediately
+    document.querySelectorAll(".n4_loading-skeleton").forEach((loader) => {
+      if (loader.style.display != "none") {
+        loader.style.display = "none";
+      }
+    });
+
+    // Show result count once loading is complete
+    document.querySelector(".location_hero_count_wrap").style.display = "block";
 
     // If user location exists, prioritize it
     if (userLocation) {
@@ -535,10 +654,5 @@ document.addEventListener("DOMContentLoaded", function () {
   addressInput.addEventListener("input", function () {
     filterHeroList(this.value);
     hideError(); // Hide any existing error messages
-  });
-
-  // Initialize the map once and then check for URL coordinates
-  initMap().then(() => {
-    checkForLocationInURL();
   });
 });
