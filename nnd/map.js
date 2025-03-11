@@ -691,7 +691,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const locationContainer = countryItem.querySelector("[fs-cmsnest-collection='location']");
 
       if (!locationContainer || locationContainer.children.length === 0) {
-        console.log("Hiding empty country:", countryItem);
         countryItem.style.display = "none"; // Hide if no locations exist
       } else {
         countryItem.style.display = "block"; // Show if locations exist
