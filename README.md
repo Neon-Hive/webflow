@@ -9,8 +9,7 @@ You can then use the file on your site by following the below structure
 <script src="https://cdn.jsdelivr.net/gh/Neon-Hive/webflow/< YOUR_FOLDER >/< YOUR_SCRIPT >.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 Add defer/async or other params as needed :)
 
-## Prerequisites 
-It can sometimes take jsdelivr some time to replace the cached file globally on its CDN. This means that if you make fast changes to the file they will not be represented throughout the world quickly (usually takes 10-15mins)
-Best to only commit files to this repo if the code has been tested locally and is unlikely to change for a period of time.
+## CDN Cache
+Use https://www.jsdelivr.com/tools/purge to purge cache on the CDN to avoid waiting 15-20mins between changes
 
 
