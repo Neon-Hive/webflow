@@ -6,6 +6,7 @@ window.locationData = window.locationData || [];
 window.fsAttributes.push([
   "cmsload",
   (cmsLoadInstances) => {
+    // First initialize cmsnest
     window.fsAttributes.cmsnest.init().then(() => {
       console.log("CMS Nest successfully initialized!");
 
@@ -22,6 +23,19 @@ window.fsAttributes.push([
       // Show all CMS locations once loading is complete
       document.querySelectorAll(".locations_nest").forEach((location) => {
         location.style.display = "";
+      });
+
+      const [filterInstance] = cmsLoadInstances;
+
+      // Then initialize cmsfilter when cmsnest is done
+      window.fsAttributes.cmsfilter.init().then(() => {
+        console.log("CMS Filter successfully initialized!");
+
+        // Hook into the 'renderitems' event - this fires after FinSweet filtering updates the DOM
+        filterInstance.listInstance.on("renderitems", () => {
+          console.log("FinSweet Filtering Applied. Checking empty countries...");
+          checkForEmptyCountries();
+        });
       });
 
       console.log("CMS Nest loading complete.");
@@ -67,7 +81,7 @@ function addItemsToLocationData() {
       });
     }
   });
-  console.log("Updated locationData:", locationData);
+  // console.log("Updated locationData:", locationData);
 
   // Dispatch a custom event to signal that locationData is ready
   window.dispatchEvent(new Event("locationDataLoaded"));
@@ -655,4 +669,42 @@ document.addEventListener("DOMContentLoaded", function () {
     filterHeroList(this.value);
     hideError(); // Hide any existing error messages
   });
+
+  // #####
+  // Handle on page dropdown filters after CMS filter is loaded
+  // #####
+  const countrySelect = document.getElementById("country");
+  const stateSelect = document.getElementById("area");
+
+  function filterCountries() {
+    const selectedCountry = countrySelect.value;
+
+    // Show or hide countries based on selection
+    document.querySelectorAll(".location_block_item_wrap").forEach((countryItem) => {
+      const country = countryItem.getAttribute("n4-filter-country");
+      countryItem.style.display = selectedCountry === "" || selectedCountry === country ? "block" : "none";
+    });
+  }
+
+  function checkForEmptyCountries() {
+    document.querySelectorAll(".location_block_item_wrap").forEach((countryItem) => {
+      const locationContainer = countryItem.querySelector("[fs-cmsnest-collection='location']");
+
+      if (!locationContainer || locationContainer.children.length === 0) {
+        console.log("Hiding empty country:", countryItem);
+        countryItem.style.display = "none"; // Hide if no locations exist
+      } else {
+        countryItem.style.display = "block"; // Show if locations exist
+      }
+    });
+  }
+
+  function filterStates() {
+    // Ensure filtering logic runs after FinSweet filtering completes
+    setTimeout(checkForEmptyCountries, 200);
+  }
+
+  // Event listeners
+  if (countrySelect) countrySelect.addEventListener("change", filterCountries);
+  if (stateSelect) stateSelect.addEventListener("change", filterStates);
 });
