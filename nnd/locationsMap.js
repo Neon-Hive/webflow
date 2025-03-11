@@ -578,11 +578,19 @@ document.addEventListener("DOMContentLoaded", function () {
       map: map,
       markers: markers,
       renderer,
-      zoomOnClick: false,
+      zoomOnClick: false, // We will handle zoom manually
       onClusterClick: (event, cluster) => {
-        // On cluster click, fit the map bounds to the markers in that cluster and set an appropriate zoom.
-        map.fitBounds(cluster.bounds);
-        map.setZoom(10);
+        const bounds = cluster.bounds;
+        map.fitBounds(bounds);
+
+        // Delay to ensure map bounds are set before checking zoom level
+        setTimeout(() => {
+          let currentZoom = map.getZoom();
+          // Prevent excessive zoom-in that hides markers
+          if (currentZoom > 14) {
+            map.setZoom(14); // Adjust max zoom to ensure pins stay visible
+          }
+        }, 300);
       },
     });
 
