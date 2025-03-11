@@ -25,9 +25,17 @@ window.fsAttributes.push([
         location.style.display = "";
       });
 
+      const [filterInstance] = cmsLoadInstances;
+
       // Then initialize cmsfilter when cmsnest is done
       window.fsAttributes.cmsfilter.init().then(() => {
         console.log("CMS Filter successfully initialized!");
+
+        // Hook into the 'renderitems' event - this fires after FinSweet filtering updates the DOM
+        filterInstance.listInstance.on("renderitems", () => {
+          console.log("FinSweet Filtering Applied. Checking empty countries...");
+          checkForEmptyCountries();
+        });
       });
 
       console.log("CMS Nest loading complete.");
