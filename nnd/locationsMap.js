@@ -25,6 +25,8 @@ window.fsAttributes.push([
         location.style.display = "";
       });
 
+      syncStateAttributes(); // Sync state attributes for dropdown filters
+
       const [filterInstance] = cmsLoadInstances;
 
       // Then initialize cmsfilter when cmsnest is done
@@ -87,6 +89,32 @@ function addItemsToLocationData() {
   window.dispatchEvent(new Event("locationDataLoaded"));
 }
 
+// Function to reapply attributes to new dropdown options
+function syncStateAttributes() {
+  const dropdownLinks = document.querySelectorAll("#w-dropdown-list-5 .filters_dropdown_list_item");
+  const originalStates = document.querySelectorAll(".cms-states .w-dyn-item[n4-filter-state-country]");
+  const fsSelectOptions = document.querySelectorAll("#area option");
+
+  originalStates.forEach((originalState) => {
+    const stateName = originalState.querySelector("div").textContent.trim();
+    const country = originalState.getAttribute("n4-filter-state-country");
+
+    // Find matching option in the new dropdown
+    fsSelectOptions.forEach((option) => {
+      if (option.textContent.trim() === stateName) {
+        option.setAttribute("n4-filter-state-country", country);
+      }
+    });
+
+    // Find matching .filters_dropdown_list_item elements
+    dropdownLinks.forEach((link) => {
+      if (link.textContent.trim() === stateName) {
+        link.setAttribute("n4-filter-state-country", country);
+      }
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   window.userLocation = null; // Ensure global variable exists
 
@@ -112,7 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (window.locationData.length > 0) {
       console.log("✅ Location data available, initializing map...");
       await initMap();
-      checkForLocationInURL();
+      await checkForLocationInURL();
     } else {
       console.log("⏳ Waiting for location data before initializing map...");
       window.addEventListener(
@@ -120,10 +148,10 @@ document.addEventListener("DOMContentLoaded", function () {
         async () => {
           console.log("📍 locationData is now loaded, initializing map...");
           await initMap();
-          checkForLocationInURL();
+          await checkForLocationInURL();
         },
-        { once: true }
-      ); // Ensure this runs only once
+        { once: true } // Ensure this runs only once
+      );
     }
   }
 
@@ -604,12 +632,25 @@ document.addEventListener("DOMContentLoaded", function () {
     const lat = parseFloat(params.get("lat"));
     const lng = parseFloat(params.get("lng"));
 
-    if (!isNaN(lat) && !isNaN(lng) && window.map) {
-      console.log("Centering map from URL parameters:", lat, lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      // Wait for the map and markers to fully initialize
+      const waitForMap = async () => {
+        return new Promise((resolve) => {
+          const check = () => {
+            if (window.map && window.markers && window.markers.length > 0) {
+              resolve();
+            } else {
+              setTimeout(check, 500);
+            }
+          };
+          check();
+        });
+      };
+
+      await waitForMap();
       window.map.setCenter({ lat, lng });
       window.map.setZoom(10);
     } else if (window.map && window.markers) {
-      // Fit map bounds to show all markers if user location is not provided
       const bounds = new google.maps.LatLngBounds();
       window.markers.forEach((marker) => bounds.extend(marker.getPosition()));
       window.map.fitBounds(bounds);
@@ -684,17 +725,40 @@ document.addEventListener("DOMContentLoaded", function () {
   const countrySelect = document.getElementById("country");
   const stateSelect = document.getElementById("area");
 
+  // Wait for Finsweet filters then check for empty countries
+  function filterStates() {
+    setTimeout(checkForEmptyCountries, 200);
+  }
+
   function filterCountries() {
     const selectedCountry = countrySelect.value;
+    const dropdownLinks = document.querySelectorAll("#w-dropdown-list-5 .filters_dropdown_list_item");
 
     // Show or hide countries based on selection
     document.querySelectorAll(".location_block_item_wrap").forEach((countryItem) => {
       const country = countryItem.getAttribute("n4-filter-country");
       countryItem.style.display = selectedCountry === "" || selectedCountry === country ? "block" : "none";
     });
+
+    // Show or hide states based on selection
+    dropdownLinks.forEach((option, index) => {
+      const optionCountry = option.getAttribute("n4-filter-state-country");
+
+      if (index === 0) {
+        // Ensure "All States" is always visible
+        option.style.display = "block";
+      } else if (!selectedCountry || selectedCountry === "") {
+        // If "All Countries" is selected, show all states
+        option.style.display = "block";
+      } else {
+        // Otherwise, filter states based on the selected country
+        option.style.display = optionCountry === selectedCountry ? "block" : "none";
+      }
+    });
   }
 
   function checkForEmptyCountries() {
+    console.log("Checking for empty countries...");
     document.querySelectorAll(".location_block_item_wrap").forEach((countryItem) => {
       const locationContainer = countryItem.querySelector("[fs-cmsnest-collection='location']");
 
@@ -706,12 +770,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  function filterStates() {
-    // Ensure filtering logic runs after FinSweet filtering completes
-    setTimeout(checkForEmptyCountries, 200);
-  }
-
   // Event listeners
   if (countrySelect) countrySelect.addEventListener("change", filterCountries);
   if (stateSelect) stateSelect.addEventListener("change", filterStates);
+
+  checkForLocationInURL(); // Check URL for location data on page load
 });
