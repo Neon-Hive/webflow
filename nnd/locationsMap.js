@@ -431,6 +431,8 @@ document.addEventListener("DOMContentLoaded", function () {
       resultCountElem.textContent = "No locations found in this area.";
     }
   }
+  // Attach it to `window` so it is globally available
+  window.updateMarkersList = updateMarkersList;
 
   async function initMap(mapElemId = "map_canvas") {
     // Request needed libraries.
