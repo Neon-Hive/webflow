@@ -2,7 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Notes: TPT = time per task && POT = % of time
 
   const WORK_DAYS_PER_YEAR = 230; // Shared between calcs - avg work amount
-  const resultsForm = document.getElementById("wf-form-ROI-Calculator---Results");
+  const potForm = document.querySelector("#POT-form form");
+  const tptForm = document.querySelector("#TPT-form form");
 
   // START - Time per Task selectors and functions =========================
 
@@ -445,7 +446,6 @@ document.addEventListener("DOMContentLoaded", function () {
   // START - ROI Results popup logic =========================
   const tptButton = document.getElementById("tpt-submit");
   const potButton = document.getElementById("pot-submit");
-  const ROITypeField = document.getElementById("ROIType");
   const popup = document.querySelector(".calculator_popup");
   const popupBackground = document.querySelector(".calculator_popup-background");
   const popupClose = document.querySelector(".calculator_popup-close");
@@ -461,15 +461,31 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function populateSharedFields() {
-    document.getElementById("result-user-location").value = document.querySelector(".user-location").textContent;
-    document.getElementById("result-user-ip").value = document.querySelector(".user-ip").textContent;
-    document.getElementById("result-browser-info").value = getBrowserInfo();
-    document.getElementById("result-submission-time").value = getCurrentTime();
+    const resultLocation = document.querySelectorAll("#result-user-location");
+    const resultIP = document.querySelectorAll("#result-user-ip");
+    const resultBrowserInfo = document.querySelectorAll("#result-browser-info");
+    const resultTime = document.querySelectorAll("#result-submission-time");
+
+    resultLocation.forEach((element) => {
+      element.value = document.querySelector(".user-location").textContent;
+    });
+    resultIP.forEach((element) => {
+      element.value = document.querySelector(".user-ip").textContent;
+    });
+
+    resultBrowserInfo.forEach((element) => {
+      element.value = getBrowserInfo();
+    });
+
+    resultTime.forEach((element) => {
+      element.value = getCurrentTime();
+    });
   }
+
+  const industryDropdown = document.querySelectorAll("#result-industry");
 
   // Populate TPT Hidden Fields
   function populateTptFields() {
-    ROITypeField.value = "TPT";
     // Results
     document.getElementById("result-tpt-current-cost").value = tptCurrentCostResult.textContent;
     document.getElementById("result-tpt-ai-cost").value = tptAiCostResult.textContent;
@@ -478,8 +494,13 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("result-tpt-ai-days").value = tptAiDaysDisplay.textContent;
     document.getElementById("result-tpt-current-fte").value = tptCurrentFTEDisplay.textContent;
     document.getElementById("result-tpt-ai-fte").value = tptAiFTEDisplay.textContent;
+
+    // Handle shared industry dropdown
+    industryDropdown.forEach((industry) => {
+      industry.value = tptIndustryDropdown.value;
+    });
+
     // Values entered
-    document.getElementById("result-industry").value = tptIndustryDropdown.value;
     document.getElementById("result-tpt-users").value = tptUsersInput.value;
     document.getElementById("result-tpt-task-time").value = tptUsersTaskTime.value;
     document.getElementById("result-tpt-ai-impact").value = tptAiImpact.value;
@@ -490,15 +511,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Populate POT Hidden Fields
   function populatePotFields() {
-    ROITypeField.value = "POT";
     // Results
     document.getElementById("result-pot-current-cost").value = potCurrentCostResult.textContent;
     document.getElementById("result-pot-ai-cost").value = potAiCostResult.textContent;
     document.getElementById("result-pot-opportunity-cost").value = potOpportunityCostResult.textContent;
     document.getElementById("result-pot-current-fte").value = potCurrentFTEDisplay.textContent;
     document.getElementById("result-pot-ai-fte").value = potAiFTEDisplay.textContent;
+
+    // Handle shared industry dropdown
+    industryDropdown.forEach((industry) => {
+      industry.value = potIndustryDropdown.value;
+    });
+
     // Values entered
-    document.getElementById("result-industry").value = potIndustryDropdown.value;
     document.getElementById("result-pot-users").value = potUsersInput.value;
     document.getElementById("result-pot-percentage-spent").value = potPercentageValueDisplay.textContent;
     document.getElementById("result-pot-ai-impact").value = potPercentageImpactValueDisplay.textContent;
@@ -511,18 +536,25 @@ document.addEventListener("DOMContentLoaded", function () {
     populateSharedFields(); // populate shared for both
     if (buttonType === "TPT") {
       populateTptFields();
+      tptForm.style.display = "flex"; // Show POT form
+      potForm.style.display = "none"; // Ensure TPT form is hidden
     } else if (buttonType === "POT") {
       populatePotFields();
+      potForm.style.display = "flex"; // Show TPT form
+      tptForm.style.display = "none"; // Ensure TPT form is hidden
     }
 
     popup.classList.add("is-active"); // Show popup
-     // stop scroll
-    document.querySelector("body").style.overflow = "hidden"; 
-    document.querySelector("body").style.msTouchAction = ""; // remove touch action??
   }
 
   function showPopup(buttonType) {
     openPopupAndPopulate(buttonType);
+  }
+
+  function resetRecaptchas() {
+    document.querySelectorAll('.calculator_popup-content iframe[title="reCAPTCHA"]').forEach(function (iframe) {
+      iframe.src = iframe.src;
+    });
   }
 
   // Function to hide the popup, reset form state
@@ -531,15 +563,16 @@ document.addEventListener("DOMContentLoaded", function () {
     if (successMessage) successMessage.style.display = "none";
     if (errorMessage) errorMessage.style.display = "none";
 
-    // Show the form so its ready again
-    resultsForm.style.display = "flex";
-    resultsForm.reset(); // reset the form
-    resultsForm.querySelector(".w-checkbox-input").classList.remove("w--redirected-checked"); // reset privacy checkbox
+    // Reset forms state
+    potForm.reset();
+    potForm.querySelector(".w-checkbox-input").classList.remove("w--redirected-checked"); // reset privacy checkbox
+    tptForm.reset();
+    tptForm.querySelector(".w-checkbox-input").classList.remove("w--redirected-checked"); // reset privacy checkbox
+
+    resetRecaptchas(); // Reset reCAPTCHA - hacky way (thanks webflow)
 
     // Remove the active class to hide the popup
     popup.classList.remove("is-active");
-    // start scroll
-    document.querySelector("body").style.overflow = ""; 
   }
 
   // Event listeners to show the popup when either button is clicked
@@ -567,3 +600,14 @@ document.addEventListener("DOMContentLoaded", function () {
     syncDropdowns(tptIndustryDropdown, potIndustryDropdown);
   });
 });
+
+// Get users location to use later
+function geoip(json) {
+  const userLocation = json.city + ", " + json.country;
+  const userIP = json.ip;
+  const userLocationElement = document.querySelector(".user-location");
+  const userIPElement = document.querySelector(".user-ip");
+
+  userLocationElement.textContent = userLocation;
+  userIPElement.textContent = userIP;
+}
