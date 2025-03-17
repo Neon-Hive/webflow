@@ -80,6 +80,7 @@ function addItemsToLocationData() {
         state: item.getAttribute("data-state") || "",
         city: item.getAttribute("data-city") || "",
         postcodes: item.getAttribute("data-postcode") || "",
+        stateISO: item.getAttribute("data-state-iso") || "",
       });
     }
   });
@@ -339,7 +340,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return; // Skip this marker
         }
 
-        const { name, link, imageUrl, distance, country, state, city, postcodes } = marker.extraData;
+        const { name, link, imageUrl, distance, country, state, city, postcodes, stateISO } = marker.extraData;
         const heroItem = document.createElement("div");
         heroItem.classList.add("location_hero_item");
 
@@ -349,13 +350,14 @@ document.addEventListener("DOMContentLoaded", function () {
         heroItem.setAttribute("n4-filter-state", state ? state.toLowerCase() : "");
         heroItem.setAttribute("n4-filter-country", country ? country.toLowerCase() : "");
         heroItem.setAttribute("n4-filter-postcodes", postcodes ? postcodes.toLowerCase() : "");
+        heroItem.setAttribute("n4-filter-stateISO", stateISO ? stateISO.toLowerCase() : "");
 
         heroItem.innerHTML = `
           <div class="location_hero_item_image_wrap">
             <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
           </div>
           <div class="location_hero_item_content">
-            <h4 class="location_hero_item_heading u-text-style-large">${name}</h4>
+            <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
             ${distance ? `<p class="u-text-style-small">${distance} km away</p>` : ""}
             <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
               <div class="learnmore_text u-text-style-main">See location</div>
@@ -395,7 +397,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (closestThree.length > 0) {
         closestThree.forEach((marker, index) => {
-          const { name, link, imageUrl, distance } = marker.extraData;
+          const { name, link, imageUrl, distance, stateISO } = marker.extraData;
 
           const heroItem = document.createElement("div");
           heroItem.classList.add("location_hero_item");
@@ -405,7 +407,7 @@ document.addEventListener("DOMContentLoaded", function () {
               <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
             </div>
             <div class="location_hero_item_content">
-              <h4 class="location_hero_item_heading u-text-style-large">${name}</h4>
+              <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
               <p class="u-text-style-small">${distance} km away</p>
               <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
                 <div class="learnmore_text u-text-style-main">See location</div>
@@ -505,6 +507,7 @@ document.addEventListener("DOMContentLoaded", function () {
         state: location.state,
         city: location.city,
         postcodes: location.postcodes || "",
+        stateISO: location.stateISO,
       };
 
       marker.addListener("click", () => {
@@ -515,7 +518,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <img style="max-height: 8rem; aspect-ratio: 16 / 9; object-position: 0% 50%;" src="${location.imageUrl}" alt="${location.name}">
               </div>
                 <div>
-                  <h4 class="location_hero_item_heading u-text-style-large">${location.name}</h4>
+                  <h4 class="location_hero_item_heading u-text-style-large">${location.name}, ${location.stateISO}</h4>
                   <p class="u-text-style-tiny">${location.city}, ${location.state}, ${location.country}</p>
                 </div>
               ${distance ? `<p style="margin: 5px 0; font-size: 14px;"><strong>${distance} km away</strong></p>` : ""}
@@ -674,8 +677,8 @@ document.addEventListener("DOMContentLoaded", function () {
     let matchesFound = false;
 
     window.markers.forEach((marker) => {
-      const { name, city, state, country, postcodes } = marker.extraData;
-      const locationText = `${name} ${city} ${state} ${country} ${postcodes}`.toLowerCase();
+      const { name, city, state, country, postcodes, stateISO } = marker.extraData;
+      const locationText = `${name} ${city} ${state} ${country} ${postcodes} ${stateISO}`.toLowerCase();
 
       if (locationText.includes(searchTerm)) {
         marker.setMap(window.map); // Show matching markers
@@ -692,6 +695,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const state = item.getAttribute("n4-filter-state") || "";
       const country = item.getAttribute("n4-filter-country") || "";
       const postcodes = item.getAttribute("n4-filter-postcodes") || "";
+      const stateISO = item.getAttribute("n4-filter-stateiso") || "";
 
       // Check if the search term matches any field
       const matches =
@@ -699,7 +703,8 @@ document.addEventListener("DOMContentLoaded", function () {
         city.includes(searchTerm) ||
         state.includes(searchTerm) ||
         country.includes(searchTerm) ||
-        postcodes.split(", ").some((p) => p.startsWith(searchTerm));
+        postcodes.split(", ").some((p) => p.startsWith(searchTerm)) ||
+        stateISO.includes(searchTerm);
     });
 
     // Update result count
