@@ -1,6 +1,6 @@
 // Handle locationData from cms load. Needed to get more than 100+ items
 window.fsAttributes = window.fsAttributes || [];
-window.locationData = window.locationData || [];
+window.locationData = window.locationData || []; // Store location data globally
 
 // Wait for FinSweet CMS Load to finish loading nest & filter
 window.fsAttributes.push([
@@ -155,9 +155,6 @@ document.addEventListener("DOMContentLoaded", function () {
       );
     }
   }
-
-  // Call function to wait for location data before initializing map
-  initMapWhenReady();
 
   // Ensure Google Maps API is fully loaded (for geocoding fallback)
   async function loadGoogleMapsAPI() {
@@ -334,6 +331,24 @@ document.addEventListener("DOMContentLoaded", function () {
     heroListElem.innerHTML = "";
 
     if (visibleMarkers.length > 0) {
+      // If geolocation is enabled, sort markers by distance before displaying
+      if (window.userLocation) {
+        visibleMarkers.forEach((marker) => {
+          marker.extraData.distance = calculateDistance(
+            window.userLocation.lat,
+            window.userLocation.lng,
+            marker.getPosition().lat(),
+            marker.getPosition().lng()
+          );
+        });
+
+        // Sort by closest first
+        visibleMarkers.sort((a, b) => a.extraData.distance - b.extraData.distance);
+      } else {
+        // If no geolocation, sort alphabetically by name
+        visibleMarkers.sort((a, b) => a.extraData.name.localeCompare(b.extraData.name));
+      }
+
       visibleMarkers.forEach((marker) => {
         if (!marker.extraData) {
           console.warn("❌ Missing extraData for marker:", marker);
@@ -358,7 +373,7 @@ document.addEventListener("DOMContentLoaded", function () {
           </div>
           <div class="location_hero_item_content">
             <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-            ${distance ? `<p class="u-text-style-small">${distance} km away</p>` : ""}
+            ${distance ? `<p class="u-text-style-small">${distance} km - remove for live</p>` : ""}
             <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
               <div class="learnmore_text u-text-style-main">See location</div>
               <div class="learnmore_underline"></div>
@@ -435,6 +450,42 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   // Attach it to `window` so it is globally available
   window.updateMarkersList = updateMarkersList;
+  window.updateLocationList = updateLocationList;
+
+  function updateLocationList(filteredMarkers) {
+    var heroListElem = document.querySelector(".location_hero_list");
+    heroListElem.innerHTML = ""; // Clear current list
+
+    filteredMarkers.forEach((marker) => {
+      const { name, link, imageUrl, stateISO } = marker.extraData;
+
+      const heroItem = document.createElement("div");
+      heroItem.classList.add("location_hero_item");
+
+      heroItem.innerHTML = `
+      <div class="location_hero_item_image_wrap">
+        <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
+      </div>
+      <div class="location_hero_item_content">
+        <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
+        <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
+          <div class="learnmore_text u-text-style-main">See location</div>
+          <div class="learnmore_underline"></div>
+          <div class="learnmore_icon w-embed">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
+              <rect y="0.5" width="18" height="18" rx="9" fill="#EC008C"></rect>
+              <path d="M10.5644 9.11433L8.55285 7.04545L9.08317 6.5L12 9.50002L9.08317 12.5L8.55285 11.9545L10.5644 9.88572H6V9.11433H10.5644Z" fill="white"></path>
+            </svg>
+          </div>
+        </a>
+      </div>
+    `;
+      heroListElem.appendChild(heroItem);
+    });
+
+    // Update result count
+    document.getElementById("map_result_count").textContent = `Showing ${filteredMarkers.length} Locations`;
+  }
 
   async function initMap(mapElemId = "map_canvas") {
     // Request needed libraries.
@@ -502,7 +553,7 @@ document.addEventListener("DOMContentLoaded", function () {
         name: location.name,
         link: location.link,
         imageUrl: location.imageUrl,
-        distance: distance,
+        distance: distance, // TODO: Remove this for live
         country: location.country,
         state: location.state,
         city: location.city,
@@ -668,56 +719,94 @@ document.addEventListener("DOMContentLoaded", function () {
     await getUserLocation(true); // Forces prompt
   });
 
-  // Listen for address form inputs and filter the hero list
-  function filterHeroList(searchTerm) {
+  // Listen for postcode/city/suburb/city form inputs and filter the hero list
+  async function filterHeroList(searchTerm) {
     const heroItems = document.querySelectorAll(".location_hero_item");
     searchTerm = searchTerm.trim().toLowerCase();
 
     let bounds = new google.maps.LatLngBounds();
     let matchesFound = false;
 
-    window.markers.forEach((marker) => {
+    let matchedMarkers = window.markers.filter((marker) => {
       const { name, city, state, country, postcodes, stateISO } = marker.extraData;
       const locationText = `${name} ${city} ${state} ${country} ${postcodes} ${stateISO}`.toLowerCase();
+      return locationText.includes(searchTerm);
+    });
 
-      if (locationText.includes(searchTerm)) {
-        marker.setMap(window.map); // Show matching markers
+    if (matchedMarkers.length > 0) {
+      // ✅ If we found an exact match, show those locations
+      matchedMarkers.forEach((marker) => {
+        marker.setMap(window.map);
         bounds.extend(marker.getPosition());
+      });
+      matchesFound = true;
+    } else {
+      // ❌ No match found in our data → Try Google Geocoding
+      console.warn(`❌ No exact match for "${searchTerm}". Querying Google...`);
+      const location = await getLatLngFromSearch(searchTerm);
+      if (location) {
+        // Find closest locations to the searched area
+        matchedMarkers = findClosestLocations(location.lat, location.lng);
+        matchedMarkers.forEach((marker) => {
+          marker.setMap(window.map);
+          bounds.extend(marker.getPosition());
+        });
         matchesFound = true;
-      } else {
-        marker.setMap(null); // Hide non-matching markers
+      }
+    }
+
+    // Hide non-matching markers
+    window.markers.forEach((marker) => {
+      if (!matchedMarkers.includes(marker)) {
+        marker.setMap(null);
       }
     });
 
-    heroItems.forEach((item) => {
-      const name = item.getAttribute("n4-filter-name") || "";
-      const city = item.getAttribute("n4-filter-city") || "";
-      const state = item.getAttribute("n4-filter-state") || "";
-      const country = item.getAttribute("n4-filter-country") || "";
-      const postcodes = item.getAttribute("n4-filter-postcodes") || "";
-      const stateISO = item.getAttribute("n4-filter-stateiso") || "";
+    // Update the left-hand list
+    updateLocationList(matchedMarkers);
 
-      // Check if the search term matches any field
-      const matches =
-        name.includes(searchTerm) ||
-        city.includes(searchTerm) ||
-        state.includes(searchTerm) ||
-        country.includes(searchTerm) ||
-        postcodes.split(", ").some((p) => p.startsWith(searchTerm)) ||
-        stateISO.includes(searchTerm);
-    });
-
-    // Update result count
-    const visibleCount = document.querySelectorAll(".location_hero_item:not([style*='display: none'])").length;
-    document.getElementById("map_result_count").textContent = `Showing ${visibleCount} Locations`;
-
-    // Adjust map to fit filtered locations
+    // Adjust the map view
     if (matchesFound) {
       window.map.fitBounds(bounds);
-      if (visibleCount === 1) {
+      if (matchedMarkers.length === 1) {
         window.map.setZoom(14); // If only one location, zoom in
       }
     }
+  }
+
+  // Function to find the closest locations to a given lat/lng
+  async function getLatLngFromSearch(searchQuery) {
+    try {
+      await loadGoogleMapsAPI(); // Ensure Google Maps API is loaded
+
+      return new Promise((resolve, reject) => {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: searchQuery }, (results, status) => {
+          if (status === "OK" && results.length > 0) {
+            const location = results[0].geometry.location;
+            console.log(`✅ Found lat/lng for "${searchQuery}":`, location);
+            resolve({ lat: location.lat(), lng: location.lng() });
+          } else {
+            console.error(`❌ No results for "${searchQuery}".`);
+            resolve(null);
+          }
+        });
+      });
+    } catch (error) {
+      console.error("❌ Error in getLatLngFromSearch:", error);
+      return null;
+    }
+  }
+
+  function findClosestLocations(searchLat, searchLng) {
+    window.markers.forEach((marker) => {
+      marker.extraData.distance = calculateDistance(searchLat, searchLng, marker.getPosition().lat(), marker.getPosition().lng());
+    });
+
+    return window.markers
+      .filter((marker) => marker.extraData.distance !== null && !isNaN(marker.extraData.distance))
+      .sort((a, b) => a.extraData.distance - b.extraData.distance)
+      .slice(0, 3); // Return the 3 closest locations
   }
 
   const addressInput = document.getElementById("geo-address");
@@ -726,13 +815,11 @@ document.addEventListener("DOMContentLoaded", function () {
     hideError(); // Hide any existing error messages
   });
 
-  // #####
-  // Handle on page dropdown filters after CMS filter is loaded
-  // #####
+  // ####### Handle on page dropdown filters after CMS filter is loaded ########
   const countrySelect = document.getElementById("country");
   const stateSelect = document.getElementById("area");
 
-  // Wait for Finsweet filters then check for empty countries
+  // Wait for FinSweet filters then check for empty countries
   function filterStates() {
     setTimeout(checkForEmptyCountries, 200);
   }
@@ -781,5 +868,6 @@ document.addEventListener("DOMContentLoaded", function () {
   if (countrySelect) countrySelect.addEventListener("change", filterCountries);
   if (stateSelect) stateSelect.addEventListener("change", filterStates);
 
+  initMapWhenReady(); // Call function to wait for location data before initializing map
   checkForLocationInURL(); // Check URL for location data on page load
 });
