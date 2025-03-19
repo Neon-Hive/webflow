@@ -356,8 +356,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const { name, link, imageUrl, distance, country, state, city, postcodes, stateISO } = marker.extraData;
-        const heroItem = document.createElement("div");
+        const heroItem = document.createElement("a");
         heroItem.classList.add("location_hero_item");
+        heroItem.href = link;
 
         // Store location data in `n4-filter-` attributes for filtering
         heroItem.setAttribute("n4-filter-name", name ? name.toLowerCase() : "");
@@ -373,8 +374,8 @@ document.addEventListener("DOMContentLoaded", function () {
           </div>
           <div class="location_hero_item_content">
             <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-            ${distance ? `<p class="u-text-style-small">${distance} km - remove for live</p>` : ""}
-            <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
+            ${distance ? `<p class="u-text-style-small">${distance} KM - DEV remove once checked</p>` : ""}
+            <div class="learnmore_wrap is-underline w-inline-block">
               <div class="learnmore_text u-text-style-main">See location</div>
               <div class="learnmore_underline"></div>
               <div class="learnmore_icon w-embed">
@@ -392,9 +393,9 @@ document.addEventListener("DOMContentLoaded", function () {
       resultCountElem.textContent = `Showing ${visibleMarkers.length} Locations`;
     } else if (window.userLocation) {
       // if we have user location display closest 3 locations
-      console.warn("❌ No visible markers. Displaying the closest 3 locations.");
+      console.warn("No visible markers. Displaying the closest 3 locations.");
 
-      // ✅ Recalculate distances after location change
+      // Recalculate distances after location change
       window.markers.forEach((marker) => {
         marker.extraData.distance = calculateDistance(
           window.userLocation.lat,
@@ -414,8 +415,9 @@ document.addEventListener("DOMContentLoaded", function () {
         closestThree.forEach((marker, index) => {
           const { name, link, imageUrl, distance, stateISO } = marker.extraData;
 
-          const heroItem = document.createElement("div");
+          const heroItem = document.createElement("a");
           heroItem.classList.add("location_hero_item");
+          heroItem.href = link;
 
           heroItem.innerHTML = `
             <div class="location_hero_item_image_wrap">
@@ -424,7 +426,7 @@ document.addEventListener("DOMContentLoaded", function () {
             <div class="location_hero_item_content">
               <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
               <p class="u-text-style-small">${distance} km away</p>
-              <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
+              <div class="learnmore_wrap is-underline w-inline-block">
                 <div class="learnmore_text u-text-style-main">See location</div>
                 <div class="learnmore_underline"></div>
                 <div class="learnmore_icon w-embed">
@@ -444,7 +446,7 @@ document.addEventListener("DOMContentLoaded", function () {
         resultCountElem.textContent = "No locations found in this area.";
       }
     } else {
-      console.warn("❌ No locations available in this area.");
+      console.warn("No locations available in this area.");
       resultCountElem.textContent = "No locations found in this area.";
     }
   }
@@ -459,8 +461,9 @@ document.addEventListener("DOMContentLoaded", function () {
     filteredMarkers.forEach((marker) => {
       const { name, link, imageUrl, stateISO } = marker.extraData;
 
-      const heroItem = document.createElement("div");
+      const heroItem = document.createElement("a");
       heroItem.classList.add("location_hero_item");
+      heroItem.href = link;
 
       heroItem.innerHTML = `
       <div class="location_hero_item_image_wrap">
@@ -468,7 +471,7 @@ document.addEventListener("DOMContentLoaded", function () {
       </div>
       <div class="location_hero_item_content">
         <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-        <a href="${link}" class="learnmore_wrap is-underline w-inline-block">
+        <div class="learnmore_wrap is-underline w-inline-block">
           <div class="learnmore_text u-text-style-main">See location</div>
           <div class="learnmore_underline"></div>
           <div class="learnmore_icon w-embed">
