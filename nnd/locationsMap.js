@@ -374,9 +374,8 @@ document.addEventListener("DOMContentLoaded", function () {
           </div>
           <div class="location_hero_item_content">
             <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-            ${distance ? `<p class="u-text-style-small">${distance} KM - DEV remove once checked</p>` : ""}
             <div class="learnmore_wrap is-underline w-inline-block">
-              <div class="learnmore_text u-text-style-main">See location</div>
+              <div class="learnmore_text u-text-style-main">See Location</div>
               <div class="learnmore_underline"></div>
               <div class="learnmore_icon w-embed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
@@ -425,9 +424,9 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
             <div class="location_hero_item_content">
               <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-              <p class="u-text-style-small">${distance} km away</p>
+              <p class="u-text-style-small">${distance} km away from you</p>
               <div class="learnmore_wrap is-underline w-inline-block">
-                <div class="learnmore_text u-text-style-main">See location</div>
+                <div class="learnmore_text u-text-style-main">See Location</div>
                 <div class="learnmore_underline"></div>
                 <div class="learnmore_icon w-embed">
                   <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
@@ -472,7 +471,7 @@ document.addEventListener("DOMContentLoaded", function () {
       <div class="location_hero_item_content">
         <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
         <div class="learnmore_wrap is-underline w-inline-block">
-          <div class="learnmore_text u-text-style-main">See location</div>
+          <div class="learnmore_text u-text-style-main">See Location</div>
           <div class="learnmore_underline"></div>
           <div class="learnmore_icon w-embed">
             <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
@@ -577,7 +576,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>
               ${distance ? `<p style="margin: 5px 0; font-size: 14px;"><strong>${distance} km away</strong></p>` : ""}
               <a href="${location.link}" class="learnmore_wrap is-underline w-inline-block">
-                <div class="learnmore_text u-text-style-main">See location</div>
+                <div class="learnmore_text u-text-style-main">See Location</div>
                 <div class="learnmore_underline"></div>
                 <div class="learnmore_icon w-embed">
                   <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
