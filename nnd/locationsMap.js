@@ -165,7 +165,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyD-y5SThmDqWvwCQgQ95LF8tsGHV68TJwk&libraries=places`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo&libraries=places`;
         script.async = true;
         script.defer = true;
         script.onload = () => {
