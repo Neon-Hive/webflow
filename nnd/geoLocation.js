@@ -7,7 +7,7 @@ async function loadGoogleMapsAPI() {
       }
 
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyD-y5SThmDqWvwCQgQ95LF8tsGHV68TJwk&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo&libraries=places`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
@@ -44,7 +44,7 @@ async function fetchAutocomplete(inputText) {
   const url = "https://places.googleapis.com/v1/places:autocomplete";
   const headers = {
     "Content-Type": "application/json",
-    "X-Goog-Api-Key": "AIzaSyD-y5SThmDqWvwCQgQ95LF8tsGHV68TJwk",
+    "X-Goog-Api-Key": "AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo",
     "X-Goog-FieldMask": "suggestions(placePrediction(place,placeId,text))",
   };
 
