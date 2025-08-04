@@ -60,9 +60,14 @@ function addItemsToLocationData() {
   const invalidPlaceholder = "https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg";
 
   document.querySelectorAll(".location_block_result_item_wrap").forEach((item) => {
+    // Build a unique key using name + lat + lng (or other unique fields)
     const name = item.getAttribute("data-name");
+    const lat = parseFloat(item.getAttribute("data-lat")) || 0;
+    const lng = parseFloat(item.getAttribute("data-lng")) || 0;
+    const uniqueKey = `${name}_${lat}_${lng}`;
 
-    if (!locationData.some((entry) => entry.name === name)) {
+    // Only add if not already present (by uniqueKey)
+    if (!locationData.some((entry) => entry.uniqueKey === uniqueKey)) {
       let imageUrl = item.querySelector("img")?.getAttribute("src") || "";
 
       // Ensure the fallback image is applied if imageUrl is empty or is the webflow placeholder
@@ -71,9 +76,10 @@ function addItemsToLocationData() {
       }
 
       locationData.push({
+        uniqueKey: uniqueKey, // Add unique key for identification
         name: name,
-        lat: parseFloat(item.getAttribute("data-lat")) || 0,
-        lng: parseFloat(item.getAttribute("data-lng")) || 0,
+        lat: lat,
+        lng: lng,
         imageUrl: imageUrl,
         link: item.getAttribute("data-link") ? `/location/${item.getAttribute("data-link")}` : "",
         country: item.getAttribute("data-country") || "",
@@ -84,7 +90,6 @@ function addItemsToLocationData() {
       });
     }
   });
-  // console.log("Updated locationData:", locationData);
 
   // Dispatch a custom event to signal that locationData is ready
   window.dispatchEvent(new Event("locationDataLoaded"));
