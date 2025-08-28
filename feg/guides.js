@@ -29,6 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentModuleIndex = 0;
     let filteredMapItems = [];
 
+    // Function to decode HTML entities
+    function decodeHtmlEntities(text) {
+      const textarea = document.createElement("textarea");
+      textarea.innerHTML = text;
+      return textarea.value;
+    }
+
     // Function to get currently visible map items based on filter
     function getFilteredMapItems() {
       return mapItems.filter((item) => {
@@ -168,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (mapModuleTitle) {
-        mapModuleTitle.textContent = mapItem.name || "";
+        mapModuleTitle.textContent = decodeHtmlEntities(mapItem.name || "");
       }
 
       if (mapItem.type === "Course") {
@@ -272,7 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (mapModuleTitle) {
-        mapModuleTitle.textContent = mapItem.name || "";
+        mapModuleTitle.textContent = decodeHtmlEntities(mapItem.name || "");
       }
 
       if (mapItem.type === "Course") {
@@ -483,35 +490,45 @@ document.addEventListener("DOMContentLoaded", () => {
       if (visibleMarkers.length > 0) {
         if (visibleMarkers.length === 1) {
           // For single markers, center but don't zoom too close
-          map.setCenter(visibleMarkers[0].getPosition());
-          map.setZoom(12);
+          const position = visibleMarkers[0].getPosition();
+          map.setCenter({ lat: position.lat(), lng: position.lng() });
+          map.setZoom(14);
         } else {
-          // For multiple markers, use dynamic padding based on screen size
-          const screenHeight = window.innerHeight;
-          const screenWidth = window.innerWidth;
-
-          // Calculate padding as percentage of screen size
-          const verticalPadding = Math.max(200, screenHeight * 0.3);
-          const horizontalPadding = Math.max(150, screenWidth * 0.25);
-
+          // For multiple markers, use the same logic as fitAllVisibleMarkersInitial
           if (!bounds.isEmpty()) {
-            map.fitBounds(bounds, {
-              padding: {
-                top: verticalPadding,
-                right: horizontalPadding,
-                bottom: verticalPadding,
-                left: horizontalPadding,
-              },
-            });
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
 
-            // small delay to ensure fitBounds completes, then check zoom level
-            setTimeout(() => {
-              const currentZoom = map.getZoom();
-              const maxZoom = 12;
-              if (currentZoom > maxZoom) {
-                map.setZoom(maxZoom);
-              }
-            }, 300);
+            // Calculate center point
+            const centerLat = (ne.lat() + sw.lat()) / 2;
+            const centerLng = (ne.lng() + sw.lng()) / 2;
+
+            // Calculate the span and add minimal extra space for marker icons
+            const latSpan = ne.lat() - sw.lat();
+            const lngSpan = ne.lng() - sw.lng();
+
+            // Add minimal extra space to account for marker icons
+            const extraLatSpan = latSpan * 0.001; // 0.1% extra vertical space (very tight fit)
+            const extraLngSpan = lngSpan * 0.001; // 0.1% extra horizontal space
+
+            // Calculate the total span needed
+            const totalLatSpan = latSpan + extraLatSpan;
+            const totalLngSpan = lngSpan + extraLngSpan;
+
+            // Calculate appropriate zoom level based on the larger span (more zoomed in)
+            const maxSpan = Math.max(totalLatSpan, totalLngSpan);
+            let zoom = 14; // Default zoom (more zoomed in)
+
+            if (maxSpan > 0.1) zoom = 11;
+            else if (maxSpan > 0.05) zoom = 12;
+            else if (maxSpan > 0.02) zoom = 13;
+            else if (maxSpan > 0.01) zoom = 14;
+            else if (maxSpan > 0.005) zoom = 15;
+            else zoom = 16;
+
+            // Set the map directly without animation for filter changes
+            map.setCenter({ lat: centerLat, lng: centerLng });
+            map.setZoom(zoom);
           }
         }
       } else {
@@ -672,18 +689,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const markerIcons = {
       Eat: {
         url: "https://cdn.prod.website-files.com/67ab6ef769ff843db623d6f5/689eb596bbb24ca62e18b198_eat-icon.svg",
-        scaledSize: new google.maps.Size(50, 65),
-        anchor: new google.maps.Point(25, 60),
       },
       Stay: {
         url: "https://cdn.prod.website-files.com/67ab6ef769ff843db623d6f5/689eb59629bee07dae592c97_stay-icon.svg",
-        scaledSize: new google.maps.Size(50, 65),
-        anchor: new google.maps.Point(25, 60),
       },
       Course: {
         url: "https://cdn.prod.website-files.com/67ab6ef769ff843db623d6f5/689eb596353ab56c0e69d870_play-icon.svg",
-        scaledSize: new google.maps.Size(50, 65),
-        anchor: new google.maps.Point(25, 60),
       },
     };
 
@@ -754,40 +765,112 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Multiple markers, fit bounds with improved padding calculation
+      // Multiple markers - manually calculate bounds and center
       const bounds = new google.maps.LatLngBounds();
       visibleMarkers.forEach((marker) => {
         bounds.extend(marker.getPosition());
       });
 
       if (!bounds.isEmpty()) {
-        // Calculate dynamic padding based on viewport and number of markers
-        const screenHeight = window.innerHeight;
-        const screenWidth = window.innerWidth;
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
 
-        const verticalPadding = Math.max(150, screenHeight * 0.2);
-        const horizontalPadding = Math.max(150, screenWidth * 0.2);
+        // Calculate center point
+        const centerLat = (ne.lat() + sw.lat()) / 2;
+        const centerLng = (ne.lng() + sw.lng()) / 2;
 
-        map.fitBounds(bounds, {
-          padding: {
-            top: verticalPadding,
-            right: horizontalPadding,
-            bottom: verticalPadding,
-            left: horizontalPadding,
-          },
-        });
+        // Calculate the span and add extra space for marker icons
+        const latSpan = ne.lat() - sw.lat();
+        const lngSpan = ne.lng() - sw.lng();
 
-        // Wait for fitBounds to complete, then check and limit zoom
-        setTimeout(() => {
-          const currentZoom = map.getZoom();
-          const maxZoom = 13;
-          if (currentZoom > maxZoom) {
-            map.setZoom(maxZoom);
-          }
-        }, 200); // Increased timeout to ensure fitBounds completes
+        // Add extra space to account for marker icons (approximately 60px tall)
+        const extraLatSpan = latSpan * 0.1; // 30% extra vertical space
+        const extraLngSpan = lngSpan * 0.1; // 10% extra horizontal space
+
+        // Calculate the total span needed
+        const totalLatSpan = latSpan + extraLatSpan;
+        const totalLngSpan = lngSpan + extraLngSpan;
+
+        // Calculate appropriate zoom level based on the larger span
+        const maxSpan = Math.max(totalLatSpan, totalLngSpan);
+        let zoom = 13; // Default zoom
+
+        if (maxSpan > 0.1) zoom = 8;
+        else if (maxSpan > 0.05) zoom = 9;
+        else if (maxSpan > 0.02) zoom = 10;
+        else if (maxSpan > 0.01) zoom = 11;
+        else if (maxSpan > 0.005) zoom = 12;
+        else zoom = 13;
+
+        // Use the smooth pan and zoom function
+        butterySmoothPanAndZoom(centerLat, centerLng, zoom, 800);
       }
 
-      console.log("Fitted all visible markers in view with improved padding");
+      console.log("Fitted all visible markers using manual calculation");
+    }
+
+    // Initial view function with less padding and more zoom
+    function fitAllVisibleMarkersInitial() {
+      const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
+
+      if (visibleMarkers.length === 0) {
+        // No visible markers, return to default view
+        map.setCenter({ lat: -33.8419, lng: 151.0834 });
+        map.setZoom(10);
+        return;
+      }
+
+      if (visibleMarkers.length === 1) {
+        // Only one marker, center on it with moderate zoom
+        const position = visibleMarkers[0].getPosition();
+        map.setCenter({ lat: position.lat(), lng: position.lng() });
+        map.setZoom(14);
+        return;
+      }
+
+      // Multiple markers - manually calculate bounds and center with less padding
+      const bounds = new google.maps.LatLngBounds();
+      visibleMarkers.forEach((marker) => {
+        bounds.extend(marker.getPosition());
+      });
+
+      if (!bounds.isEmpty()) {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+
+        // Calculate center point
+        const centerLat = (ne.lat() + sw.lat()) / 2;
+        const centerLng = (ne.lng() + sw.lng()) / 2;
+
+        // Calculate the span and add minimal extra space for marker icons
+        const latSpan = ne.lat() - sw.lat();
+        const lngSpan = ne.lng() - sw.lng();
+
+        // Add minimal extra space to account for marker icons
+        const extraLatSpan = latSpan * 0.001; // 0.1% extra vertical space (very tight fit)
+        const extraLngSpan = lngSpan * 0.001; // 0.1% extra horizontal space
+
+        // Calculate the total span needed
+        const totalLatSpan = latSpan + extraLatSpan;
+        const totalLngSpan = lngSpan + extraLngSpan;
+
+        // Calculate appropriate zoom level based on the larger span (more zoomed in)
+        const maxSpan = Math.max(totalLatSpan, totalLngSpan);
+        let zoom = 14; // Default zoom (more zoomed in)
+
+        if (maxSpan > 0.1) zoom = 11;
+        else if (maxSpan > 0.05) zoom = 12;
+        else if (maxSpan > 0.02) zoom = 13;
+        else if (maxSpan > 0.01) zoom = 14;
+        else if (maxSpan > 0.005) zoom = 15;
+        else zoom = 16;
+
+        // Set the map directly without animation for initial load
+        map.setCenter({ lat: centerLat, lng: centerLng });
+        map.setZoom(zoom);
+      }
+
+      console.log("Fitted all visible markers for initial view");
     }
 
     // Easing function for smooth animation
@@ -922,8 +1005,8 @@ document.addEventListener("DOMContentLoaded", () => {
           // Stop any marker animations
           Object.values(markers).forEach((m) => m.setAnimation(null));
 
-          // Fit all visible markers in view
-          fitAllVisibleMarkers();
+          // Fit all visible markers in view (use initial view function for consistency)
+          fitAllVisibleMarkersInitial();
         }
         return;
       }
@@ -970,7 +1053,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initialize with 'all' filter
     setTimeout(() => {
       applyMapFilter("all");
-      handleScroll();
+      fitAllVisibleMarkersInitial(); // Use initial view function instead of handleScroll
     }, 500);
   }
 
