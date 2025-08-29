@@ -196,9 +196,11 @@ document.addEventListener("DOMContentLoaded", () => {
         let hasValidLink = false;
 
         if (mapItem.type === "Course") {
-          // Courses always have a link pattern
-          mapModuleLink.href = `/courses/${mapItem.slug}`;
-          hasValidLink = true;
+          if (mapItem.courseRef && mapItem.courseRef.trim() !== "") {
+            // Courses always have a link pattern
+            mapModuleLink.href = `/courses/${mapItem.slug}`;
+            hasValidLink = true;
+          }
         } else if (mapItem.link && mapItem.link.trim() !== "") {
           // For Stay/Eat, only show if there's a valid link
           mapModuleLink.href = mapItem.link;
@@ -392,30 +394,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // Mobile list / map toggle
     const mobileListViewBtn = document.querySelector("#guideMobileList");
     const mobileMapViewBtn = document.querySelector("#guideMobileMap");
-    const mobileMapViewWrapper = document.querySelector(".guide_map-wrap");
-    const mobileItemsViewWrapper = document.querySelector(".guide_body-items-append");
 
     // Mobile: Toggle list view
     mobileListViewBtn.addEventListener("click", () => {
-      mobileListViewBtn.classList.add("is-active");
-      mobileMapViewBtn.classList.remove("is-active");
-      mobileItemsViewWrapper.classList.remove("u-hide");
-      mapEnlargedViewWrapper.classList.add("u-hide");
-      mobileMapViewWrapper.style.display = "none";
-      isMapEnlarged = !isMapEnlarged;
+      isMapEnlarged = false;
     });
 
     // Mobile: Toggle map view
     mobileMapViewBtn.addEventListener("click", () => {
-      mobileMapViewBtn.classList.add("is-active");
-      mobileListViewBtn.classList.remove("is-active");
-      mobileItemsViewWrapper.classList.add("u-hide");
-      mapEnlargedViewWrapper.classList.remove("u-hide");
-      mobileMapViewWrapper.style.display = "block";
-
+      isMapEnlarged = true;
       // Initialize the map module when entering map view
       initializeMapModule();
-      isMapEnlarged = !isMapEnlarged;
     });
 
     // Mobile / Enlarged: Add event listeners for navigation buttons
@@ -1264,6 +1253,33 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   const mobileFilterText = mobileFilterToggle.querySelectorAll(".filters_toggle_text");
 
+  // Mobile list / map toggle
+  const mapEnlargedViewWrapper = document.querySelector(".guide_map-enlarge-view");
+  const mobileListViewBtn = document.querySelector("#guideMobileList");
+  const mobileMapViewBtn = document.querySelector("#guideMobileMap");
+  const mobileMapViewWrapper = document.querySelector(".guide_map-wrap");
+  const mobileItemsViewWrapper = document.querySelector(".guide_body-items-append");
+
+  // Mobile: Toggle list view
+  mobileListViewBtn.addEventListener("click", () => {
+    mobileListViewBtn.classList.add("is-active");
+    mobileMapViewBtn.classList.remove("is-active");
+    mobileItemsViewWrapper.classList.remove("u-hide");
+    mapEnlargedViewWrapper.classList.add("u-hide");
+    mobileMapViewWrapper.style.display = "none";
+    isMapEnlarged = false;
+  });
+
+  // Mobile: Toggle map view
+  mobileMapViewBtn.addEventListener("click", () => {
+    mobileMapViewBtn.classList.add("is-active");
+    mobileListViewBtn.classList.remove("is-active");
+    mobileItemsViewWrapper.classList.add("u-hide");
+    mapEnlargedViewWrapper.classList.remove("u-hide");
+    mobileMapViewWrapper.style.display = "block";
+    isMapEnlarged = true;
+  });
+
   let mobileFiltersOpen = false;
 
   function closeMobileFilters() {
@@ -1278,6 +1294,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function openMobileFilters() {
     mobileFiltersOpen = true;
     if (isMapEnlarged) {
+      console.log("map enlarged");
       mobileFilters.classList.add("is-open-map");
     } else {
       mobileFilters.classList.add("is-open-list");
@@ -1291,6 +1308,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Mobile: Close filter button
   mobileFilterToggle.addEventListener("click", () => {
+    console.log("mobie filter toggle clicked");
     if (mobileFiltersOpen) {
       closeMobileFilters();
     } else {
