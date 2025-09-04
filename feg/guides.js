@@ -483,41 +483,23 @@ document.addEventListener("DOMContentLoaded", () => {
           map.setCenter({ lat: position.lat(), lng: position.lng() });
           map.setZoom(14);
         } else {
-          // For multiple markers, use the same logic as fitAllVisibleMarkersInitial
+          // For multiple markers, use fitBounds (same as initial load and scroll)
           if (!bounds.isEmpty()) {
-            const ne = bounds.getNorthEast();
-            const sw = bounds.getSouthWest();
+            // Use fitBounds with padding to ensure all markers are visible
+            map.fitBounds(bounds, {
+              top: 50,
+              right: 50,
+              bottom: 50,
+              left: 50,
+            });
 
-            // Calculate center point
-            const centerLat = (ne.lat() + sw.lat()) / 2;
-            const centerLng = (ne.lng() + sw.lng()) / 2;
-
-            // Calculate the span and add minimal extra space for marker icons
-            const latSpan = ne.lat() - sw.lat();
-            const lngSpan = ne.lng() - sw.lng();
-
-            // Add minimal extra space to account for marker icons
-            const extraLatSpan = latSpan * 0.001; // 0.1% extra vertical space (very tight fit)
-            const extraLngSpan = lngSpan * 0.001; // 0.1% extra horizontal space
-
-            // Calculate the total span needed
-            const totalLatSpan = latSpan + extraLatSpan;
-            const totalLngSpan = lngSpan + extraLngSpan;
-
-            // Calculate appropriate zoom level based on the larger span (more zoomed in)
-            const maxSpan = Math.max(totalLatSpan, totalLngSpan);
-            let zoom = 14; // Default zoom (more zoomed in)
-
-            if (maxSpan > 0.1) zoom = 11;
-            else if (maxSpan > 0.05) zoom = 12;
-            else if (maxSpan > 0.02) zoom = 13;
-            else if (maxSpan > 0.01) zoom = 14;
-            else if (maxSpan > 0.005) zoom = 15;
-            else zoom = 16;
-
-            // Set the map directly without animation for filter changes
-            map.setCenter({ lat: centerLat, lng: centerLng });
-            map.setZoom(zoom);
+            // Limit max zoom to ensure we don't zoom in too much
+            setTimeout(() => {
+              const currentZoom = map.getZoom();
+              if (currentZoom > 10) {
+                map.setZoom(10);
+              }
+            }, 100);
           }
         }
       } else {
@@ -737,66 +719,66 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentAnimation = null;
     let currentActiveSlug = null;
 
-    function fitAllVisibleMarkers() {
-      const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
+    // function fitAllVisibleMarkers() {
+    //   const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
 
-      if (visibleMarkers.length === 0) {
-        // No visible markers, return to default view
-        map.setCenter({ lat: -33.8419, lng: 151.0834 });
-        map.setZoom(10);
-        return;
-      }
+    //   if (visibleMarkers.length === 0) {
+    //     // No visible markers, return to default view
+    //     map.setCenter({ lat: -33.8419, lng: 151.0834 });
+    //     map.setZoom(10);
+    //     return;
+    //   }
 
-      if (visibleMarkers.length === 1) {
-        // Only one marker, center on it with moderate zoom
-        const position = visibleMarkers[0].getPosition();
-        butterySmoothPanAndZoom(position.lat(), position.lng(), 12, 800);
-        return;
-      }
+    //   if (visibleMarkers.length === 1) {
+    //     // Only one marker, center on it with moderate zoom
+    //     const position = visibleMarkers[0].getPosition();
+    //     butterySmoothPanAndZoom(position.lat(), position.lng(), 12, 800);
+    //     return;
+    //   }
 
-      // Multiple markers - manually calculate bounds and center
-      const bounds = new google.maps.LatLngBounds();
-      visibleMarkers.forEach((marker) => {
-        bounds.extend(marker.getPosition());
-      });
+    //   // Multiple markers - manually calculate bounds and center
+    //   const bounds = new google.maps.LatLngBounds();
+    //   visibleMarkers.forEach((marker) => {
+    //     bounds.extend(marker.getPosition());
+    //   });
 
-      if (!bounds.isEmpty()) {
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
+    //   if (!bounds.isEmpty()) {
+    //     const ne = bounds.getNorthEast();
+    //     const sw = bounds.getSouthWest();
 
-        // Calculate center point
-        const centerLat = (ne.lat() + sw.lat()) / 2;
-        const centerLng = (ne.lng() + sw.lng()) / 2;
+    //     // Calculate center point
+    //     const centerLat = (ne.lat() + sw.lat()) / 2;
+    //     const centerLng = (ne.lng() + sw.lng()) / 2;
 
-        // Calculate the span and add extra space for marker icons
-        const latSpan = ne.lat() - sw.lat();
-        const lngSpan = ne.lng() - sw.lng();
+    //     // Calculate the span and add extra space for marker icons
+    //     const latSpan = ne.lat() - sw.lat();
+    //     const lngSpan = ne.lng() - sw.lng();
 
-        // Add extra space to account for marker icons (approximately 60px tall)
-        const extraLatSpan = latSpan * 0.1; // 30% extra vertical space
-        const extraLngSpan = lngSpan * 0.1; // 10% extra horizontal space
+    //     // Add extra space to account for marker icons (approximately 60px tall)
+    //     const extraLatSpan = latSpan * 0.1; // 30% extra vertical space
+    //     const extraLngSpan = lngSpan * 0.1; // 10% extra horizontal space
 
-        // Calculate the total span needed
-        const totalLatSpan = latSpan + extraLatSpan;
-        const totalLngSpan = lngSpan + extraLngSpan;
+    //     // Calculate the total span needed
+    //     const totalLatSpan = latSpan + extraLatSpan;
+    //     const totalLngSpan = lngSpan + extraLngSpan;
 
-        // Calculate appropriate zoom level based on the larger span
-        const maxSpan = Math.max(totalLatSpan, totalLngSpan);
-        let zoom = 13; // Default zoom
+    //     // Calculate appropriate zoom level based on the larger span
+    //     const maxSpan = Math.max(totalLatSpan, totalLngSpan);
+    //     let zoom = 13; // Default zoom
 
-        if (maxSpan > 0.1) zoom = 8;
-        else if (maxSpan > 0.05) zoom = 9;
-        else if (maxSpan > 0.02) zoom = 10;
-        else if (maxSpan > 0.01) zoom = 11;
-        else if (maxSpan > 0.005) zoom = 12;
-        else zoom = 13;
+    //     if (maxSpan > 0.1) zoom = 8;
+    //     else if (maxSpan > 0.05) zoom = 9;
+    //     else if (maxSpan > 0.02) zoom = 10;
+    //     else if (maxSpan > 0.01) zoom = 11;
+    //     else if (maxSpan > 0.005) zoom = 12;
+    //     else zoom = 13;
 
-        // Use the smooth pan and zoom function
-        butterySmoothPanAndZoom(centerLat, centerLng, zoom, 800);
-      }
+    //     // Use the smooth pan and zoom function
+    //     butterySmoothPanAndZoom(centerLat, centerLng, zoom, 800);
+    //   }
 
-      console.log("Fitted all visible markers using manual calculation");
-    }
+    //   console.log("Fitted all visible markers using manual calculation");
+    // }
 
     // Initial view function with less padding and more zoom
     function fitAllVisibleMarkersInitial() {
@@ -813,7 +795,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Only one marker, center on it with moderate zoom
         const position = visibleMarkers[0].getPosition();
         map.setCenter({ lat: position.lat(), lng: position.lng() });
-        map.setZoom(14);
+        map.setZoom(4);
         return;
       }
 
@@ -994,8 +976,33 @@ document.addEventListener("DOMContentLoaded", () => {
           // Stop any marker animations
           Object.values(markers).forEach((m) => m.setAnimation(null));
 
-          // Fit all visible markers in view (use initial view function for consistency)
-          fitAllVisibleMarkersInitial();
+          // Fit all visible markers in view using fitBounds (same as initial load)
+          const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
+
+          if (visibleMarkers.length > 1) {
+            const bounds = new google.maps.LatLngBounds();
+            visibleMarkers.forEach((marker) => {
+              bounds.extend(marker.getPosition());
+            });
+
+            if (!bounds.isEmpty()) {
+              // Use fitBounds with padding to ensure all markers are visible
+              map.fitBounds(bounds, {
+                top: 50,
+                right: 50,
+                bottom: 50,
+                left: 50,
+              });
+
+              // Limit max zoom to ensure we don't zoom in too much
+              setTimeout(() => {
+                const currentZoom = map.getZoom();
+                if (currentZoom > 10) {
+                  map.setZoom(10);
+                }
+              }, 100);
+            }
+          }
         }
         return;
       }
@@ -1042,7 +1049,36 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initialize with 'all' filter
     setTimeout(() => {
       applyMapFilter("all");
-      fitAllVisibleMarkersInitial(); // Use initial view function instead of handleScroll
+
+      // Use fitBounds to show all pins properly
+      setTimeout(() => {
+        const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
+
+        if (visibleMarkers.length > 1) {
+          const bounds = new google.maps.LatLngBounds();
+          visibleMarkers.forEach((marker) => {
+            bounds.extend(marker.getPosition());
+          });
+
+          if (!bounds.isEmpty()) {
+            // Use fitBounds with padding to ensure all markers are visible
+            map.fitBounds(bounds, {
+              top: 50,
+              right: 50,
+              bottom: 50,
+              left: 50,
+            });
+
+            // Limit max zoom to ensure we don't zoom in too much
+            setTimeout(() => {
+              const currentZoom = map.getZoom();
+              if (currentZoom > 10) {
+                map.setZoom(10);
+              }
+            }, 100);
+          }
+        }
+      }, 200);
     }, 500);
   }
 
