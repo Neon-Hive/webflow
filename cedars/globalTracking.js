@@ -53,8 +53,8 @@ function getErrorInfo() {
 
 // Categories that represent article verticals - we don't want to double track
 const ARTICLE_CATEGORIES = new Set([
-  "healthy-living",
   "expert-advice",
+  "healthy-living",
   "research-innovations",
   "community-impact",
   "international",
@@ -79,7 +79,12 @@ function isArticleDetail(url = location) {
   return !NON_DETAIL.has(slug);
 }
 
-const userECID = Visitor.getInstance("cedarssinai")?.getMarketingCloudVisitorID?.();
+function getUserECID() {
+  if (typeof Visitor !== "undefined" && Visitor.getInstance) {
+    return Visitor.getInstance("cedarssinai")?.getMarketingCloudVisitorID?.();
+  }
+  return undefined;
+}
 
 // Track page views for non-article detail pages
 if (!isArticleDetail()) {
@@ -87,7 +92,7 @@ if (!isArticleDetail()) {
   const errorInfo = getErrorInfo();
   const pageViewData = {
     event: "pageView",
-    userECID,
+    userECID: getUserECID(),
     navigation: {
       domain: location.hostname,
       // section = first segment (e.g. "stories-and-insights")
@@ -113,6 +118,10 @@ if (!isArticleDetail()) {
   }
 
   adobeDataLayer.push(pageViewData);
+
+  if (enableLogging) {
+    console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(pageViewData, null, 2));
+  }
 }
 
 // Track clicks on links, buttons, and elements with [data-track-click] =============================
