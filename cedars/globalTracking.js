@@ -1,5 +1,5 @@
-// Toggle console logging for debugging
-const enableLogging = true;
+// Controlled in global header
+const enableLogging = window.enableLogging;
 
 // Helper functions
 function toPlainLower(s) {
