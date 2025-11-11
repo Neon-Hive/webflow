@@ -190,6 +190,11 @@ document.addEventListener("DOMContentLoaded", () => {
         mapEatBadge.style.display = "flex";
         mapPlayBadge.style.display = "none";
         mapStayBadge.style.display = "none";
+      } else if (mapItem.type === "Explore") {
+        mapExploreBadge.style.display = "flex";
+        mapPlayBadge.style.display = "none";
+        mapStayBadge.style.display = "none";
+        mapEatBadge.style.display = "none";
       }
 
       if (mapModuleLink) {
@@ -218,7 +223,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Handle course-specific elements (price and access)
-      const hasPriceData = mapItem.type === "Course" && mapItem.price && mapItem.price.trim() !== "";
+      const hasPriceData =
+        mapItem.type === "Course" && mapItem.price && mapItem.price.trim() !== "";
       if (mapModulePrice) {
         if (hasPriceData) {
           mapModulePrice.textContent = mapItem.price;
@@ -230,7 +236,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      const hasAccessData = mapItem.type === "Course" && mapItem.access && mapItem.access.trim() !== "";
+      const hasAccessData =
+        mapItem.type === "Course" && mapItem.access && mapItem.access.trim() !== "";
       if (mapModuleAccess) {
         if (hasAccessData) {
           mapModuleAccess.textContent = mapItem.access;
@@ -296,6 +303,11 @@ document.addEventListener("DOMContentLoaded", () => {
         mapEatBadge.style.display = "flex";
         mapPlayBadge.style.display = "none";
         mapStayBadge.style.display = "none";
+      } else if (mapItem.type === "Explore") {
+        mapExploreBadge.style.display = "flex";
+        mapPlayBadge.style.display = "none";
+        mapStayBadge.style.display = "none";
+        mapEatBadge.style.display = "none";
       }
 
       if (mapModuleLink) {
@@ -319,7 +331,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Handle course-specific elements (price and access)
-      const hasPriceData = mapItem.type === "Course" && mapItem.price && mapItem.price.trim() !== "";
+      const hasPriceData =
+        mapItem.type === "Course" && mapItem.price && mapItem.price.trim() !== "";
       if (mapModulePrice) {
         if (hasPriceData) {
           mapModulePrice.textContent = mapItem.price;
@@ -331,7 +344,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      const hasAccessData = mapItem.type === "Course" && mapItem.access && mapItem.access.trim() !== "";
+      const hasAccessData =
+        mapItem.type === "Course" && mapItem.access && mapItem.access.trim() !== "";
       if (mapModuleAccess) {
         if (hasAccessData) {
           mapModuleAccess.textContent = mapItem.access;
@@ -368,7 +382,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function navigateToPrev() {
       if (filteredMapItems.length === 0) return;
 
-      currentModuleIndex = currentModuleIndex === 0 ? filteredMapItems.length - 1 : currentModuleIndex - 1;
+      currentModuleIndex =
+        currentModuleIndex === 0 ? filteredMapItems.length - 1 : currentModuleIndex - 1;
       updateMapModule(filteredMapItems[currentModuleIndex]);
       updateNavigationButtons();
     }
@@ -664,6 +679,9 @@ document.addEventListener("DOMContentLoaded", () => {
       Stay: {
         url: "https://cdn.prod.website-files.com/67ab6ef769ff843db623d6f5/689eb59629bee07dae592c97_stay-icon.svg",
       },
+      Explore: {
+        url: "https://cdn.prod.website-files.com/67ab6ef769ff843db623d6f5/6913c01e6b3f268e781254e8_explore-icon.svg",
+      },
       Course: {
         url: "https://cdn.prod.website-files.com/67ab6ef769ff843db623d6f5/689eb596353ab56c0e69d870_play-icon.svg",
       },
@@ -781,68 +799,68 @@ document.addEventListener("DOMContentLoaded", () => {
     // }
 
     // Initial view function with less padding and more zoom
-    function fitAllVisibleMarkersInitial() {
-      const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
+    // function fitAllVisibleMarkersInitial() {
+    //   const visibleMarkers = Object.values(markers).filter((marker) => marker.getVisible());
 
-      if (visibleMarkers.length === 0) {
-        // No visible markers, return to default view
-        map.setCenter({ lat: -33.8419, lng: 151.0834 });
-        map.setZoom(10);
-        return;
-      }
+    //   if (visibleMarkers.length === 0) {
+    //     // No visible markers, return to default view
+    //     map.setCenter({ lat: -33.8419, lng: 151.0834 });
+    //     map.setZoom(10);
+    //     return;
+    //   }
 
-      if (visibleMarkers.length === 1) {
-        // Only one marker, center on it with moderate zoom
-        const position = visibleMarkers[0].getPosition();
-        map.setCenter({ lat: position.lat(), lng: position.lng() });
-        map.setZoom(4);
-        return;
-      }
+    //   if (visibleMarkers.length === 1) {
+    //     // Only one marker, center on it with moderate zoom
+    //     const position = visibleMarkers[0].getPosition();
+    //     map.setCenter({ lat: position.lat(), lng: position.lng() });
+    //     map.setZoom(4);
+    //     return;
+    //   }
 
-      // Multiple markers - manually calculate bounds and center with less padding
-      const bounds = new google.maps.LatLngBounds();
-      visibleMarkers.forEach((marker) => {
-        bounds.extend(marker.getPosition());
-      });
+    //   // Multiple markers - manually calculate bounds and center with less padding
+    //   const bounds = new google.maps.LatLngBounds();
+    //   visibleMarkers.forEach((marker) => {
+    //     bounds.extend(marker.getPosition());
+    //   });
 
-      if (!bounds.isEmpty()) {
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
+    //   if (!bounds.isEmpty()) {
+    //     const ne = bounds.getNorthEast();
+    //     const sw = bounds.getSouthWest();
 
-        // Calculate center point
-        const centerLat = (ne.lat() + sw.lat()) / 2;
-        const centerLng = (ne.lng() + sw.lng()) / 2;
+    //     // Calculate center point
+    //     const centerLat = (ne.lat() + sw.lat()) / 2;
+    //     const centerLng = (ne.lng() + sw.lng()) / 2;
 
-        // Calculate the span and add minimal extra space for marker icons
-        const latSpan = ne.lat() - sw.lat();
-        const lngSpan = ne.lng() - sw.lng();
+    //     // Calculate the span and add minimal extra space for marker icons
+    //     const latSpan = ne.lat() - sw.lat();
+    //     const lngSpan = ne.lng() - sw.lng();
 
-        // Add minimal extra space to account for marker icons
-        const extraLatSpan = latSpan * 0.001; // 0.1% extra vertical space (very tight fit)
-        const extraLngSpan = lngSpan * 0.001; // 0.1% extra horizontal space
+    //     // Add minimal extra space to account for marker icons
+    //     const extraLatSpan = latSpan * 0.001; // 0.1% extra vertical space (very tight fit)
+    //     const extraLngSpan = lngSpan * 0.001; // 0.1% extra horizontal space
 
-        // Calculate the total span needed
-        const totalLatSpan = latSpan + extraLatSpan;
-        const totalLngSpan = lngSpan + extraLngSpan;
+    //     // Calculate the total span needed
+    //     const totalLatSpan = latSpan + extraLatSpan;
+    //     const totalLngSpan = lngSpan + extraLngSpan;
 
-        // Calculate appropriate zoom level based on the larger span (more zoomed in)
-        const maxSpan = Math.max(totalLatSpan, totalLngSpan);
-        let zoom = 14; // Default zoom (more zoomed in)
+    //     // Calculate appropriate zoom level based on the larger span (more zoomed in)
+    //     const maxSpan = Math.max(totalLatSpan, totalLngSpan);
+    //     let zoom = 14; // Default zoom (more zoomed in)
 
-        if (maxSpan > 0.1) zoom = 11;
-        else if (maxSpan > 0.05) zoom = 12;
-        else if (maxSpan > 0.02) zoom = 13;
-        else if (maxSpan > 0.01) zoom = 14;
-        else if (maxSpan > 0.005) zoom = 15;
-        else zoom = 16;
+    //     if (maxSpan > 0.1) zoom = 11;
+    //     else if (maxSpan > 0.05) zoom = 12;
+    //     else if (maxSpan > 0.02) zoom = 13;
+    //     else if (maxSpan > 0.01) zoom = 14;
+    //     else if (maxSpan > 0.005) zoom = 15;
+    //     else zoom = 16;
 
-        // Set the map directly without animation for initial load
-        map.setCenter({ lat: centerLat, lng: centerLng });
-        map.setZoom(zoom);
-      }
+    //     // Set the map directly without animation for initial load
+    //     map.setCenter({ lat: centerLat, lng: centerLng });
+    //     map.setZoom(zoom);
+    //   }
 
-      console.log("Fitted all visible markers for initial view");
-    }
+    //   console.log("Fitted all visible markers for initial view");
+    // }
 
     // Easing function for smooth animation
     function easeInOutCubic(t) {
