@@ -1,5 +1,5 @@
-// Controls
-const enableLogging = true; // Toggle console logging for debugging
+// Toggle console logging for debugging
+const enableLogging = true;
 
 // Helper functions
 function toPlainLower(s) {
@@ -13,6 +13,42 @@ function getUrlSegment(index) {
   const segments = location.pathname.split("/").filter(Boolean);
   const segment = segments[index - 1] || "";
   return segment.split(".")[0];
+}
+
+function getErrorInfo() {
+  const errorCodeMap = {
+    400: "bad request",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not found",
+    500: "internal server error",
+    502: "bad gateway",
+    503: "service unavailable",
+    504: "gateway timeout",
+  };
+
+  const pageTitle = document.title.toLowerCase();
+  const titleErrorPatterns = [
+    { pattern: /404|not found/, code: 404 },
+    { pattern: /403|forbidden/, code: 403 },
+    { pattern: /401|unauthorized/, code: 401 },
+    { pattern: /400|bad request/, code: 400 },
+    { pattern: /500|internal server error/, code: 500 },
+    { pattern: /502|bad gateway/, code: 502 },
+    { pattern: /503|service unavailable/, code: 503 },
+    { pattern: /504|gateway timeout/, code: 504 },
+  ];
+
+  for (const { pattern, code } of titleErrorPatterns) {
+    if (pattern.test(pageTitle)) {
+      return {
+        code: code.toString(),
+        label: errorCodeMap[code] || `error ${code}`,
+      };
+    }
+  }
+
+  return null;
 }
 
 // Categories that represent article verticals - we don't want to double track
@@ -43,39 +79,40 @@ function isArticleDetail(url = location) {
   return !NON_DETAIL.has(slug);
 }
 
-const ecid =
-  window.Visitor && Visitor.getInstance
-    ? Visitor.getInstance("cedarssinai")?.getMarketingCloudVisitorID?.()
-    : undefined;
+const userECID = Visitor.getInstance("cedarssinai")?.getMarketingCloudVisitorID?.();
 
-// duplicate-guard in case the snippet loads twice
-if (!window.__ADOBE_NON_BLOG_PV__) {
-  window.__ADOBE_NON_BLOG_PV__ = true;
+// Track page views for non-article detail pages
+if (!isArticleDetail()) {
+  window.adobeDataLayer = window.adobeDataLayer || [];
+  const errorInfo = getErrorInfo();
+  const pageViewData = {
+    event: "pageView",
+    userECID,
+    navigation: {
+      domain: location.hostname,
+      // section = first segment (e.g. "stories-and-insights")
+      siteSection: getUrlSegment(1),
+      siteSubsection1: getUrlSegment(2),
+      siteSubsection2: getUrlSegment(3),
+      siteSubsection3: getUrlSegment(4),
+      siteSubsection4: getUrlSegment(5),
+      pageURL: location.href,
+      refURL: document.referrer || "",
+    },
+    pageName:
+      "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
+    pageTitle: (() => {
+      const h1 = document.querySelector("h1");
+      return h1 ? toPlainLower(h1.textContent) : toPlainLower(document.title);
+    })(),
+    eventTimestamp: Date.now(),
+  };
 
-  if (!isArticleDetail()) {
-    window.adobeDataLayer = window.adobeDataLayer || [];
-    const sec1 = getUrlSegment(1);
-    const sec2 = getUrlSegment(2);
-    const siteSection = [sec1, sec2].filter(Boolean).join("/");
-    adobeDataLayer.push({
-      event: "pageView",
-      ecid,
-      navigation: {
-        domain: location.hostname,
-        // section = first 1–2 parts (e.g. "stories-and-insights/healthy-living" or "patients")
-        siteSection: siteSection,
-        siteSubsection1: getUrlSegment(1) || "",
-        siteSubsection2: getUrlSegment(2) || "",
-        siteSubsection3: getUrlSegment(3) || "",
-        siteSubsection4: getUrlSegment(4) || "",
-        pageURL: location.href,
-        refURL: document.referrer || "",
-      },
-      pageName: "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
-      pageTitle: document.title,
-      eventTimestamp: Date.now(),
-    });
+  if (errorInfo) {
+    pageViewData.errors = errorInfo;
   }
+
+  adobeDataLayer.push(pageViewData);
 }
 
 // Track clicks on links, buttons, and elements with [data-track-click] =============================
@@ -94,18 +131,23 @@ function handleAnalyticsClick(event) {
 
   // --- Dynamic Data Collection Basics ---
   const linkHref = clickedElement.getAttribute("href") || "";
-  const linkText = clickedElement.innerText || clickedElement.getAttribute("aria-label") || "N/A";
+  const rawLinkText = clickedElement.innerText || clickedElement.getAttribute("aria-label") || "";
+  const linkText = toPlainLower(rawLinkText.replace(/\n+/g, " ").replace(/\s+/g, " ").trim());
   const isTel = linkHref.startsWith("tel:");
   const isMailto = linkHref.startsWith("mailto:");
   const isHttp = linkHref.startsWith("http");
   const isExternalHost = isHttp && !linkHref.includes(window.location.hostname);
   const isExternal = isTel || isMailto || isExternalHost;
-  const componentName = clickedElement.closest("[data-component-name]")?.getAttribute("data-component-name");
-  const componentTitle =
-    clickedElement.closest("[data-component-title]")?.getAttribute("data-component-title") || "N/A";
-  const linkAction = clickedElement.getAttribute("data-link-action") || "link"; // Default action is 'link'
-  const linkType = clickedElement.getAttribute("data-link-type") || "cta"; // Default type is 'cta'
-  const sectionTag = clickedElement.getAttribute("data-section") || "N/A"; // For Article/Related tags
+  const componentName = (
+    clickedElement.closest("[data-component-name]")?.getAttribute("data-component-name") || ""
+  ).toLowerCase();
+  const componentTitle = toPlainLower(
+    clickedElement.closest("[data-component-title]")?.getAttribute("data-component-title") || "",
+  );
+  const linkAction = (clickedElement.getAttribute("data-link-action") || "link").toLowerCase();
+  const linkType = (clickedElement.getAttribute("data-link-type") || "cta").toLowerCase();
+  //TODO: Add section tag back in if client needs it
+  // const sectionTag = clickedElement.getAttribute("data-section") || ""; // For Article/Related tags
   let eventData = {};
 
   // --- Component-Specific Tracking Logic ---
@@ -118,7 +160,7 @@ function handleAnalyticsClick(event) {
       isExternalLink: isExternal,
       linkAction: "link",
       linkText: linkText,
-      section: sectionTag,
+      // section: sectionTag,
       linkType: linkType,
       eventTimestamp: Date.now(),
     };
@@ -134,7 +176,7 @@ function handleAnalyticsClick(event) {
       isExternalLink: isExternal,
       linkAction: "link",
       linkText: linkText,
-      section: sectionTag,
+      // section: sectionTag,
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
@@ -150,7 +192,7 @@ function handleAnalyticsClick(event) {
       isExternalLink: isExternal,
       linkAction: "link",
       linkText: linkText,
-      section: sectionTag,
+      // section: sectionTag,
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
@@ -203,6 +245,7 @@ function handleAnalyticsClick(event) {
       console.log("Tracking event 'topics menu':", eventData);
     }
   } else if (componentName === "pagination") {
+    const paginationLinkText = clickedElement.getAttribute("data-link-text") || "";
     eventData = {
       event: "click",
       componentName: "pagination",
@@ -210,7 +253,9 @@ function handleAnalyticsClick(event) {
       linkHref: linkHref,
       isExternalLink: isExternal,
       linkAction: "link",
-      linkText: clickedElement.getAttribute("data-link-text") || linkText,
+      linkText: paginationLinkText
+        ? toPlainLower(paginationLinkText.replace(/\n+/g, " ").replace(/\s+/g, " ").trim())
+        : linkText,
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
@@ -241,7 +286,10 @@ function handleAnalyticsClick(event) {
   if (eventData.event) {
     adobeDataLayer.push(eventData);
     if (enableLogging) {
-      console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(adobeDataLayer, null, 2));
+      console.log(
+        `DataLayer for ${window.location.href}:`,
+        JSON.stringify(adobeDataLayer, null, 2),
+      );
     }
   }
 }
@@ -292,7 +340,8 @@ function trackFormLoadsOnView(selector = "form[data-form-name]") {
         if (!isIntersecting || seen.has(target)) return;
         seen.add(target);
 
-        const name = target.getAttribute("data-form-name") || target.name || target.id || "unnamed-form";
+        const name =
+          target.getAttribute("data-form-name") || target.name || target.id || "unnamed-form";
         const app = target.getAttribute("data-app") || "stories-and-insights";
 
         window.adobeDataLayer?.push({
@@ -426,7 +475,8 @@ function attachFormTracking(
     // Focus/Blur + Input/Change on fields
     const fields = form.querySelectorAll("input, select, textarea");
     fields.forEach((field) => {
-      const fieldName = field.name || field.id || field.getAttribute("data-field") || "unnamed-field";
+      const fieldName =
+        field.name || field.id || field.getAttribute("data-field") || "unnamed-field";
       const fieldType = (field.type || field.tagName).toLowerCase();
 
       field.addEventListener("focus", () => {
@@ -516,7 +566,8 @@ function attachFormOutcomeTracking(
   form,
   { application = "stories-and-insights", formNameAttr = "data-form-name" } = {},
 ) {
-  const name = form.getAttribute(formNameAttr) || form.getAttribute("name") || form.id || "unnamed-form";
+  const name =
+    form.getAttribute(formNameAttr) || form.getAttribute("name") || form.id || "unnamed-form";
 
   // A small flag so our global AJAX hooks know which form triggered the call.
   let awaitingAjaxForThisForm = false; // cleared out when we see success/fail
