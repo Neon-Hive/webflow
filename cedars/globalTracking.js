@@ -123,7 +123,7 @@ if (!isArticleDetail()) {
   getUserECIDAsync().then((userECID) => {
     const pageViewData = {
       event: "pageView",
-      userECID: userECID || undefined,
+      ecid: userECID || undefined,
       navigation: {
         domain: location.hostname,
         // section = first segment (e.g. "stories-and-insights")
@@ -260,7 +260,7 @@ function handleAnalyticsClick(event) {
       event: "click",
       componentName: "topics menu",
       componentTitle: componentTitle,
-      clickHref: linkHref, // clickHref instead as per docs
+      clickHref: linkHref,
       isExternalLink: isExternal,
       linkAction: linkAction,
       linkText: linkText,
@@ -268,17 +268,47 @@ function handleAnalyticsClick(event) {
       eventTimestamp: Date.now(),
     };
   } else if (componentName === "pagination") {
-    const paginationLinkText = clickedElement.getAttribute("data-link-text") || "";
+    // Extract query parameter from the clicked link + Handle both absolute and relative URLs
+    const url = linkHref.startsWith("http")
+      ? new URL(linkHref)
+      : new URL(linkHref, window.location.origin);
+    const queryString = url.search;
+
+    // Build full URL
+    const currentUrl = new URL(window.location.href);
+    const fullUrl = currentUrl.origin + currentUrl.pathname + queryString;
+
+    // Check for previous/next buttons - check clicked element and its parents
+    const paginationButton =
+      clickedElement.closest(".w-pagination-previous, .w-pagination-next") || clickedElement;
+    const classList = paginationButton.classList;
+    const ariaLabel = paginationButton.getAttribute("aria-label") || "";
+    const isPrevious =
+      classList.contains("w-pagination-previous") || ariaLabel.toLowerCase().includes("previous");
+    const isNext =
+      classList.contains("w-pagination-next") || ariaLabel.toLowerCase().includes("next");
+
+    let paginationLinkText;
+    if (isPrevious) {
+      paginationLinkText = "previous";
+    } else if (isNext) {
+      paginationLinkText = "next";
+    } else {
+      // Extract page number from query parameter
+      const pageMatch = queryString.match(/[?&]b583dbbd_page=(\d+)/);
+      const pageNumber = pageMatch ? pageMatch[1] : null;
+      // Format linkText as "page x"
+      paginationLinkText = pageNumber ? `page ${pageNumber}` : linkText;
+    }
+
     eventData = {
       event: "click",
       componentName: "pagination",
       componentTitle: componentTitle,
-      linkHref: linkHref,
+      linkHref: fullUrl,
       isExternalLink: isExternal,
       linkAction: "link",
-      linkText: paginationLinkText
-        ? toPlainLower(paginationLinkText.replace(/\n+/g, " ").replace(/\s+/g, " ").trim())
-        : linkText,
+      linkText: toPlainLower(paginationLinkText),
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
