@@ -60,7 +60,7 @@ const ARTICLE_CATEGORIES = new Set([
   "international",
 ]);
 
-// Identify article-detail URLs only (keep tracking on category/landing pages)
+// Identify article-detail URLs only (keep tracking on category/landing pages) - per page tracking handles this
 function isArticleDetail(url = location) {
   const parts = url.pathname
     .replace(/(^\/+|\/+$)/g, "")
@@ -86,42 +86,74 @@ function getUserECID() {
   return undefined;
 }
 
+// Wait for Visitor API to be ready and return ECID
+function getUserECIDAsync(maxWaitMs = 5000, pollIntervalMs = 100) {
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+
+    const checkECID = () => {
+      const ecid = getUserECID();
+      if (ecid) {
+        resolve(ecid);
+        return;
+      }
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= maxWaitMs) {
+        // Timeout reached, resolve with undefined
+        resolve(undefined);
+        return;
+      }
+
+      // Continue polling
+      setTimeout(checkECID, pollIntervalMs);
+    };
+
+    // Start checking immediately
+    checkECID();
+  });
+}
+
 // Track page views for non-article detail pages
 if (!isArticleDetail()) {
   window.adobeDataLayer = window.adobeDataLayer || [];
   const errorInfo = getErrorInfo();
-  const pageViewData = {
-    event: "pageView",
-    userECID: getUserECID(),
-    navigation: {
-      domain: location.hostname,
-      // section = first segment (e.g. "stories-and-insights")
-      siteSection: getUrlSegment(1),
-      siteSubsection1: getUrlSegment(2),
-      siteSubsection2: getUrlSegment(3),
-      siteSubsection3: getUrlSegment(4),
-      siteSubsection4: getUrlSegment(5),
-      pageURL: location.href,
-      refURL: document.referrer || "",
-    },
-    pageName:
-      "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
-    pageTitle: (() => {
-      const h1 = document.querySelector("h1");
-      return h1 ? toPlainLower(h1.textContent) : toPlainLower(document.title);
-    })(),
-    eventTimestamp: Date.now(),
-  };
 
-  if (errorInfo) {
-    pageViewData.errors = errorInfo;
-  }
+  // Wait for ECID before pushing page view
+  getUserECIDAsync().then((userECID) => {
+    const pageViewData = {
+      event: "pageView",
+      userECID: userECID || undefined,
+      navigation: {
+        domain: location.hostname,
+        // section = first segment (e.g. "stories-and-insights")
+        siteSection: getUrlSegment(1),
+        siteSubsection1: getUrlSegment(2),
+        siteSubsection2: getUrlSegment(3),
+        siteSubsection3: getUrlSegment(4),
+        siteSubsection4: getUrlSegment(5),
+        pageURL: location.href,
+        refURL: document.referrer || "",
+      },
+      pageName:
+        "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
+      pageTitle: (() => {
+        const h1 = document.querySelector("h1");
+        return h1 ? toPlainLower(h1.textContent) : toPlainLower(document.title);
+      })(),
+      eventTimestamp: Date.now(),
+    };
 
-  adobeDataLayer.push(pageViewData);
+    if (errorInfo) {
+      pageViewData.errors = errorInfo;
+    }
 
-  if (enableLogging) {
-    console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(pageViewData, null, 2));
-  }
+    adobeDataLayer.push(pageViewData);
+
+    if (enableLogging) {
+      console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(pageViewData, null, 2));
+    }
+  });
 }
 
 // Track clicks on links, buttons, and elements with [data-track-click] =============================
@@ -173,9 +205,6 @@ function handleAnalyticsClick(event) {
       linkType: linkType,
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'article grid':", eventData);
-    }
   } else if (componentName === "related articles") {
     eventData = {
       event: "click",
@@ -189,9 +218,6 @@ function handleAnalyticsClick(event) {
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'related articles':", eventData);
-    }
   } else if (componentName === "product ad") {
     eventData = {
       event: "click",
@@ -205,9 +231,6 @@ function handleAnalyticsClick(event) {
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'product ad':", eventData);
-    }
   } else if (componentName === "color card") {
     eventData = {
       event: "click",
@@ -220,9 +243,6 @@ function handleAnalyticsClick(event) {
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'color card':", eventData);
-    }
   } else if (componentName === "subscribe") {
     eventData = {
       event: "click",
@@ -235,9 +255,6 @@ function handleAnalyticsClick(event) {
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'subscribe':", eventData);
-    }
   } else if (componentName === "topics menu") {
     eventData = {
       event: "click",
@@ -250,9 +267,6 @@ function handleAnalyticsClick(event) {
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'topics menu':", eventData);
-    }
   } else if (componentName === "pagination") {
     const paginationLinkText = clickedElement.getAttribute("data-link-text") || "";
     eventData = {
@@ -268,9 +282,6 @@ function handleAnalyticsClick(event) {
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'pagination':", eventData);
-    }
   }
   // --- GENERIC/FALLBACK CLICK TRACKING ---
   else if (componentName) {
@@ -286,9 +297,6 @@ function handleAnalyticsClick(event) {
       linkType: linkType,
       eventTimestamp: Date.now(),
     };
-    if (enableLogging) {
-      console.log("Tracking event 'generic':", eventData);
-    }
   }
 
   // Push the determined event data if an event object was created
