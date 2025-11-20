@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!richText) return;
 
   handleRichTextColumns();
+  ensureProviderMarker();
   handleCtaBlocks();
 
   let ctaState = window.innerWidth <= 991;
@@ -41,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     handleRichTextColumns();
+    ensureProviderMarker();
   });
 });
 
@@ -134,6 +136,7 @@ function handleRichTextColumns() {
 }
 
 function handleCtaBlocks() {
+  ensureProviderMarker();
   const isMobile = window.innerWidth <= 991;
 
   if (isMobile) {
@@ -241,9 +244,39 @@ function hideCtaBlocks() {
 
 const providerScrollTriggers = [];
 
+function ensureProviderMarker() {
+  const providerList = document.querySelector("[data-cta-type='provider-list']");
+  if (!providerList) return;
+
+  const richText = document.querySelector("[data-n4-rich-text='true']");
+  if (!richText) return;
+
+  const hasMarker = Array.from(richText.querySelectorAll("p")).some(
+    (p) => p.textContent.trim() === "{{providers}}",
+  );
+  if (hasMarker) return;
+
+  const paragraphs = Array.from(richText.querySelectorAll("p"));
+  if (!paragraphs.length) return;
+
+  const firstCtaMarker = paragraphs.find((p) => p.textContent.trim() === "{{cta-block}}");
+  if (!firstCtaMarker) return;
+
+  const fallbackIndex = Math.min(2, paragraphs.length - 1); // TODO: control the count of how deep the marker should be inserted
+  const fallbackParagraph = paragraphs[fallbackIndex];
+  const insertionTarget =
+    paragraphs.indexOf(firstCtaMarker) >= fallbackIndex ? firstCtaMarker : fallbackParagraph;
+
+  const marker = document.createElement("p");
+  marker.textContent = "{{providers}}";
+  marker.setAttribute("data-generated-provider-marker", "true");
+  insertionTarget.parentNode.insertBefore(marker, insertionTarget.nextSibling);
+}
+
 function initializeCtaScrollTrigger() {
   const ctaListContainer = document.querySelector("[data-cta-list]");
   if (!ctaListContainer) return;
+  ensureProviderMarker();
 
   const regularCtaItems = Array.from(document.querySelectorAll("[data-cta-type='cta']"));
   const providerListWrapper = document.querySelector("[data-cta-type='provider-list']");
