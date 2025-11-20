@@ -1,3 +1,6 @@
+// Note: webflowCMSData comes from global var.
+
+// Decode HTML entities ==============================
 function decodeHtmlEntities(str) {
   if (!str) return "";
   const textarea = document.createElement("textarea");
@@ -5,6 +8,7 @@ function decodeHtmlEntities(str) {
   return textarea.value;
 }
 
+// Convert string to plain lower case ==============================
 function toPlainLower(s) {
   return String(s || "")
     .trim()
@@ -12,12 +16,14 @@ function toPlainLower(s) {
     .replace(/[^a-z0-9&.\-_, |]+/g, "");
 }
 
+// Get URL segment ==============================
 function getUrlSegment(index) {
   const segments = location.pathname.split("/").filter(Boolean);
   const segment = segments[index - 1] || "";
   return segment.split(".")[0];
 }
 
+// Get User ECID ==============================
 function getUserECID() {
   if (typeof Visitor !== "undefined" && Visitor.getInstance) {
     return Visitor.getInstance("cedarssinai")?.getMarketingCloudVisitorID?.();
@@ -25,7 +31,7 @@ function getUserECID() {
   return undefined;
 }
 
-// Wait for Visitor API to be ready and return ECID
+// Wait for Visitor API to be ready and return ECID ==============================
 function getUserECIDAsync(maxWaitMs = 5000, pollIntervalMs = 100) {
   return new Promise((resolve) => {
     const startTime = Date.now();
@@ -53,81 +59,104 @@ function getUserECIDAsync(maxWaitMs = 5000, pollIntervalMs = 100) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const blogTags = Array.from(
-    document.querySelectorAll("[data-adobe-tags-list] [data-component-title]"),
-  )
+// Get blog tags from page ==============================
+function getBlogTags() {
+  return Array.from(document.querySelectorAll("[data-adobe-tags-list] [data-component-title]"))
     .map((el) => toPlainLower(el.getAttribute("data-component-title")))
     .filter(Boolean)
     .join("|");
+}
 
-  let totalWords = 0;
+// Calculate blog length from rich text content ==============================
+function getBlogLength() {
   const richTextContainer = document.querySelector("[data-n4-rich-text]");
+  if (!richTextContainer) return 0;
 
-  if (richTextContainer) {
-    const combinedText = richTextContainer.textContent || "";
-    totalWords = combinedText.split(/\s+/).filter(Boolean).length;
-  }
+  const combinedText = richTextContainer.textContent || "";
+  const totalWords = combinedText.split(/\s+/).filter(Boolean).length;
+  return totalWords > 0 ? Math.round(totalWords / 100) * 100 : 0;
+}
 
-  const blogLength = totalWords > 0 ? Math.round(totalWords / 100) * 100 : 0;
+// Set data-section values for CTA and provider elements ==============================
+function setCtaSectionAttributes() {
+  const ctaList = document.querySelector("[data-cta-list]");
+  if (!ctaList) return;
 
-  // This include the Providers and the CTAs cards
-  const blogProductAds = Array.from(
-    document.querySelectorAll("[data-cta-type='provider'], [data-cta-type='cta']"),
-  )
-    .map((el) => {
-      return toPlainLower(el.getAttribute("data-cta-name")?.trim());
-    })
+  const allCtaItems = ctaList.querySelectorAll("[data-cta-type='provider'], [data-cta-type='cta']");
+  const sectionLabels = ["first", "second", "third", "fourth", "fifth"];
+
+  allCtaItems.forEach((el, index) => {
+    if (index >= sectionLabels.length) return;
+
+    const ctaType = el.getAttribute("data-cta-type");
+    const sectionValue = sectionLabels[index];
+
+    if (ctaType === "provider") {
+      // For provider type, set data-section on the button inside
+      const button = el.querySelector("[data-component-name='product ad']");
+      if (button) {
+        button.setAttribute("data-section", sectionValue);
+      }
+    } else if (ctaType === "cta") {
+      // For CTA type, set data-section on the main link (the one with data-component-name="product ad")
+      const mainLink = el.querySelector("a[data-component-name='product ad']");
+      if (mainLink) {
+        mainLink.setAttribute("data-section", sectionValue);
+      }
+    }
+  });
+}
+
+// Get blog product ads list ==============================
+function getBlogProductAds() {
+  return Array.from(document.querySelectorAll("[data-cta-type='provider'], [data-cta-type='cta']"))
+    .map((el) => toPlainLower(el.getAttribute("data-cta-name")?.trim()))
     .filter(Boolean)
     .join("|");
+}
 
-  // // Webflow CMS Data
-  // const webflowCMSData = {
-  //   blogCategory:
-  //     "{{wf {&quot;path&quot;:&quot;new-collection&quot;,&quot;type&quot;:&quot;Option&quot;} }}",
-  //   blogPrimaryTopic:
-  //     "{{wf {&quot;path&quot;:&quot;topic:name&quot;,&quot;type&quot;:&quot;PlainText&quot;} }}",
-  //   blogPublishDate:
-  //     "{{wf {&quot;path&quot;:&quot;datefirstpubished&quot;,&quot;transformers&quot;:[{&quot;name&quot;:&quot;date&quot;,&quot;arguments&quot;:[&quot;MMM DD, YYYY&quot;]}],&quot;type&quot;:&quot;Date&quot;} }}",
-  //   blogModifiedDate:
-  //     "{{wf {&quot;path&quot;:&quot;updated-on&quot;,&quot;transformers&quot;:[{&quot;name&quot;:&quot;date&quot;,&quot;arguments&quot;:[&quot;MMM DD, YYYY&quot;]}],&quot;type&quot;:&quot;Date&quot;} }}",
-  //   blogAuthor:
-  //     "{{wf {&quot;path&quot;:&quot;lead-author:name&quot;,&quot;type&quot;:&quot;PlainText&quot;} }}",
-  // };
+// Get page title ==============================
+function getPageTitle() {
+  const h1 = document.querySelector("h1");
+  return h1 ? toPlainLower(h1.textContent) : toPlainLower(document.title);
+}
 
-  // Track page views for article pages - wait for ECID
+// Create page view data object ==============================
+function createPageViewData(userECID, blogTags, blogLength, blogProductAds) {
+  return {
+    event: "pageView",
+    ecid: userECID || undefined,
+    navigation: {
+      domain: location.hostname,
+      siteSection: getUrlSegment(1),
+      siteSubsection1: getUrlSegment(2),
+      siteSubsection2: getUrlSegment(3),
+      siteSubsection3: getUrlSegment(4),
+      siteSubsection4: getUrlSegment(5),
+      pageURL: location.href,
+      refURL: document.referrer || "",
+    },
+    pageName:
+      "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
+    pageTitle: getPageTitle(),
+    eventTimestamp: Date.now(),
+    blog: {
+      blogCategory: toPlainLower(decodeHtmlEntities(webflowCMSData.blogCategory)),
+      blogPrimaryTopic: toPlainLower(decodeHtmlEntities(webflowCMSData.blogPrimaryTopic)),
+      blogTags,
+      blogPublishDate: toPlainLower(decodeHtmlEntities(webflowCMSData.blogPublishDate)),
+      blogModifiedDate: toPlainLower(decodeHtmlEntities(webflowCMSData.blogModifiedDate)),
+      blogAuthor: toPlainLower(decodeHtmlEntities(webflowCMSData.blogAuthor)),
+      blogLength,
+      blogProductAds,
+    },
+  };
+}
+
+// Track page view ==============================
+function trackPageView(blogTags, blogLength, blogProductAds) {
   getUserECIDAsync().then((userECID) => {
-    const pageViewData = {
-      event: "pageView",
-      ecid: userECID || undefined,
-      navigation: {
-        domain: location.hostname,
-        siteSection: getUrlSegment(1),
-        siteSubsection1: getUrlSegment(2),
-        siteSubsection2: getUrlSegment(3),
-        siteSubsection3: getUrlSegment(4),
-        siteSubsection4: getUrlSegment(5),
-        pageURL: location.href,
-        refURL: document.referrer || "",
-      },
-      pageName:
-        "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
-      pageTitle: (() => {
-        const h1 = document.querySelector("h1");
-        return h1 ? toPlainLower(h1.textContent) : toPlainLower(document.title);
-      })(),
-      eventTimestamp: Date.now(),
-      blog: {
-        blogCategory: toPlainLower(decodeHtmlEntities(webflowCMSData.blogCategory)),
-        blogPrimaryTopic: toPlainLower(decodeHtmlEntities(webflowCMSData.blogPrimaryTopic)),
-        blogTags,
-        blogPublishDate: toPlainLower(decodeHtmlEntities(webflowCMSData.blogPublishDate)),
-        blogModifiedDate: toPlainLower(decodeHtmlEntities(webflowCMSData.blogModifiedDate)),
-        blogAuthor: toPlainLower(decodeHtmlEntities(webflowCMSData.blogAuthor)),
-        blogLength,
-        blogProductAds,
-      },
-    };
+    const pageViewData = createPageViewData(userECID, blogTags, blogLength, blogProductAds);
 
     adobeDataLayer.push(pageViewData);
 
@@ -135,68 +164,135 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(pageViewData, null, 2));
     }
   });
+}
 
-  // Track richtext content block text links
-  const richtextContainer = document.querySelector("[data-n4-rich-text='true']");
-  if (richtextContainer) {
-    // Get article title - try h1 first
-    const articleTitleEl = document.querySelector("h1");
-    const articleTitle = articleTitleEl
-      ? articleTitleEl.textContent.trim()
-      : document.title.split(" | ")[0] || document.title;
+// Determine link type based on parent text ==============================
+function getLinkType(link) {
+  const rawLinkText = link.textContent.trim() || link.getAttribute("aria-label") || "";
+  const parentElement = link.parentElement;
 
-    // Track all links within the richtext content area
-    richtextContainer.addEventListener("click", (e) => {
-      const link = e.target.closest("a");
-      if (!link) return;
-
-      const linkHref = (link.getAttribute("href") || "").trim();
-      if (!linkHref) return;
-
-      const rawLinkText = link.textContent.trim() || link.getAttribute("aria-label") || "";
-      const linkText = toPlainLower(rawLinkText.replace(/\n+/g, " ").replace(/\s+/g, " ").trim());
-
-      const isTel = linkHref.startsWith("tel:");
-      const isMailto = linkHref.startsWith("mailto:");
-      const isHttp = /^https?:\/\//i.test(linkHref);
-      const isExternalHost = isHttp && !linkHref.includes(location.hostname);
-      const isExternalLink = isTel || isMailto || isExternalHost;
-
-      // Determine linkType based on parent element text like "Read:" in parent <p> tag
-      let linkType = "cta";
-      const parentElement = link.parentElement;
-      if (parentElement) {
-        // Get the text content of the parent element includes "Read:" if present
-        const parentText = parentElement.textContent.trim();
-        const normalizedParentText = parentText.toLowerCase();
-        if (normalizedParentText.startsWith("read:")) {
-          linkType = "primary cta";
-        } else if (rawLinkText.trim()) {
-          linkType = "secondary cta";
-        }
-      } else if (rawLinkText.trim()) {
-        linkType = "secondary cta";
-      }
-
-      const articleTitleLower = toPlainLower(articleTitle);
-
-      const eventData = {
-        event: "click",
-        componentName: "content block text",
-        componentTitle: articleTitleLower,
-        linkHref,
-        isExternalLink,
-        linkAction: "link",
-        linkText,
-        linkType,
-        eventTimestamp: Date.now(),
-      };
-
-      adobeDataLayer.push(eventData);
-
-      if (enableLogging) {
-        console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(eventData, null, 2));
-      }
-    });
+  if (!parentElement) {
+    return rawLinkText.trim() ? "secondary cta" : "cta";
   }
+
+  const parentText = parentElement.textContent.trim();
+  const normalizedParentText = parentText.toLowerCase();
+
+  if (normalizedParentText.startsWith("read:")) {
+    return "primary cta";
+  }
+
+  return rawLinkText.trim() ? "secondary cta" : "cta";
+}
+
+// Track richtext content block text links ==============================
+function trackRichtextLinks() {
+  const richtextContainer = document.querySelector("[data-n4-rich-text='true']");
+  if (!richtextContainer) return;
+
+  const articleTitleEl = document.querySelector("h1");
+  const articleTitle = articleTitleEl
+    ? articleTitleEl.textContent.trim()
+    : document.title.split(" | ")[0] || document.title;
+
+  richtextContainer.addEventListener("click", (e) => {
+    const link = e.target.closest("a");
+    if (!link) return;
+
+    const linkHref = (link.getAttribute("href") || "").trim();
+    if (!linkHref) return;
+
+    const rawLinkText = link.textContent.trim() || link.getAttribute("aria-label") || "";
+    const linkText = toPlainLower(rawLinkText.replace(/\n+/g, " ").replace(/\s+/g, " ").trim());
+
+    const isTel = linkHref.startsWith("tel:");
+    const isMailto = linkHref.startsWith("mailto:");
+    const isHttp = /^https?:\/\//i.test(linkHref);
+    const isExternalHost = isHttp && !linkHref.includes(location.hostname);
+    const isExternalLink = isTel || isMailto || isExternalHost;
+
+    const linkType = getLinkType(link);
+    const articleTitleLower = toPlainLower(articleTitle);
+
+    const eventData = {
+      event: "click",
+      componentName: "content block text",
+      componentTitle: articleTitleLower,
+      linkHref,
+      isExternalLink,
+      linkAction: "link",
+      linkText,
+      linkType,
+      eventTimestamp: Date.now(),
+    };
+
+    adobeDataLayer.push(eventData);
+
+    if (enableLogging) {
+      console.log(`DataLayer for ${window.location.href}:`, JSON.stringify(eventData, null, 2));
+    }
+  });
+}
+
+// Track product ad impressions on scroll ==============================
+function trackProductAdImpressions({
+  selector = '[data-cta-type="product ad"], [data-cta-type="provider"]',
+  placementAttr = "data-section",
+  creativeAttr = "data-impression-creative",
+  contentAttr = "data-impression-content",
+} = {}) {
+  const seen = new WeakSet();
+  const obs = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.intersectionRatio >= 0.75 && !seen.has(e.target)) {
+          seen.add(e.target);
+          const el = e.target;
+
+          let placement = "";
+          if (el.getAttribute("data-cta-type") === "provider") {
+            const button = el.querySelector('[data-component-name="product ad"]');
+            placement = button ? toPlainLower(button.getAttribute(placementAttr) || "") : "";
+          } else {
+            placement = toPlainLower(el.getAttribute(placementAttr) || "");
+          }
+
+          const creative = toPlainLower(el.getAttribute(creativeAttr) || "");
+          const content = toPlainLower(el.getAttribute(contentAttr) || "");
+
+          window.adobeDataLayer?.push({
+            event: "impression",
+            eventTimestamp: Date.now(),
+            impression: "product ad",
+            impressionPlacement: placement || "",
+            impressionCreative: creative || "",
+            impressionContent: content || "",
+          });
+        }
+      });
+    },
+    { threshold: [0, 0.75, 1] },
+  );
+
+  document.querySelectorAll(selector).forEach((el) => obs.observe(el));
+}
+
+// Initialize article tracking ==============================
+document.addEventListener("DOMContentLoaded", () => {
+  const blogTags = getBlogTags();
+  const blogLength = getBlogLength();
+  const blogProductAds = getBlogProductAds();
+
+  // Set data-section attributes after a delay to ensure richtext is loaded
+  // Then set up impression tracking to ensure data-section values are available
+  setTimeout(() => {
+    setCtaSectionAttributes();
+    trackProductAdImpressions();
+  }, 1000);
+
+  // Track page view
+  trackPageView(blogTags, blogLength, blogProductAds);
+
+  // Track richtext links
+  trackRichtextLinks();
 });
