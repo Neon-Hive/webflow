@@ -186,13 +186,30 @@ function handleAnalyticsClick(event) {
     clickedElement.closest("[data-component-title]")?.getAttribute("data-component-title") || "",
   );
   const linkAction = (clickedElement.getAttribute("data-link-action") || "link").toLowerCase();
-  const linkType = (clickedElement.getAttribute("data-link-type") || "cta").toLowerCase();
-  //TODO: Add section tag back in if client needs it
-  // const sectionTag = clickedElement.getAttribute("data-section") || ""; // For Article/Related tags
+  const linkType =
+    clickedElement.closest("[data-link-type]")?.getAttribute("data-link-type") ||
+    "cta".toLowerCase();
+  // Get sectionTag - check clicked element first, then closest parent
+  const sectionTag = (
+    clickedElement.getAttribute("data-section") ||
+    clickedElement.closest("[data-section]")?.getAttribute("data-section") ||
+    ""
+  ).toLowerCase(); // For Article grid / Related articles / product ads
   let eventData = {};
 
   // --- Component-Specific Tracking Logic ---
   if (componentName === "article grid") {
+    // Prefer the article headline text for linkText
+    let processedLinkText = linkText;
+    const articleGridRoot =
+      clickedElement.closest("[data-component-name='article grid']") || clickedElement;
+    const headlineElement =
+      articleGridRoot.querySelector("p[data-headline]") ||
+      clickedElement.querySelector("p[data-headline]");
+    if (headlineElement) {
+      const headlineText = headlineElement.textContent.trim();
+      processedLinkText = toPlainLower(headlineText);
+    }
     eventData = {
       event: "click",
       componentName: "article grid",
@@ -200,12 +217,22 @@ function handleAnalyticsClick(event) {
       linkHref: linkHref,
       isExternalLink: isExternal,
       linkAction: "link",
-      linkText: linkText,
-      // section: sectionTag,
+      linkText: processedLinkText,
+      section: sectionTag,
       linkType: linkType,
       eventTimestamp: Date.now(),
     };
   } else if (componentName === "related articles") {
+    // Use the related article title if available
+    let relatedArticleText = linkText;
+    const relatedArticleRoot =
+      clickedElement.closest("[data-component-name='related articles']") || clickedElement;
+    const headlineElement = relatedArticleRoot.querySelector(
+      "p.articles-small_text.u-text-style-title-m",
+    );
+    if (headlineElement) {
+      relatedArticleText = toPlainLower(headlineElement.textContent.trim());
+    }
     eventData = {
       event: "click",
       componentName: "related articles",
@@ -213,11 +240,12 @@ function handleAnalyticsClick(event) {
       linkHref: linkHref,
       isExternalLink: isExternal,
       linkAction: "link",
-      linkText: linkText,
-      // section: sectionTag,
+      linkText: relatedArticleText,
+      section: sectionTag,
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
+    // Note these are 'ctas'
   } else if (componentName === "product ad") {
     eventData = {
       event: "click",
@@ -227,7 +255,7 @@ function handleAnalyticsClick(event) {
       isExternalLink: isExternal,
       linkAction: "link",
       linkText: linkText,
-      // section: sectionTag,
+      section: sectionTag,
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
@@ -339,43 +367,6 @@ function handleAnalyticsClick(event) {
       );
     }
   }
-}
-
-// Track product ad impressions ==============================
-function trackProductAdImpressions({
-  selector = '[data-component-name="product ad"]',
-  placementAttr = "data-impression-placement", // e.g. "first"|"second"|"third"
-  creativeAttr = "data-impression-creative", // e.g. "sign-up for email"
-  contentAttr = "data-impression-content", // optional variant
-} = {}) {
-  const seen = new WeakSet();
-  const obs = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.intersectionRatio >= 0.75 && !seen.has(e.target)) {
-          seen.add(e.target);
-          const el = e.target;
-          const placement = toPlainLower(el.getAttribute(placementAttr) || "");
-          const creative = toPlainLower(el.getAttribute(creativeAttr) || "");
-          const content = toPlainLower(el.getAttribute(contentAttr) || "");
-
-          window.adobeDataLayer?.push({
-            event: "impression",
-            eventTimestamp: Date.now(),
-            impression: "product ad",
-            impressionPlacement: placement || "", // "first"/"second"/"third"
-            impressionCreative: creative || "",
-            impressionContent: content || undefined,
-          });
-        }
-      });
-    },
-    { threshold: [0, 0.75, 1] },
-  );
-
-  // TODO: is this needed? Also support legacy attribute from temp.js implementation
-  // document.querySelectorAll('[data-track-impression="product ad"]').forEach((el) => obs.observe(el));
-  document.querySelectorAll(selector).forEach((el) => obs.observe(el));
 }
 
 // Track form loads ==============================
@@ -769,8 +760,24 @@ document.addEventListener("DOMContentLoaded", () => {
     sendValues: false,
   });
 
-  // Track ad impressions in product ad components
-  trackProductAdImpressions();
+  /*
+   * Stories and Insights Homepage article grid tracking
+   * First item in each grid gets "primary cta", rest get "secondary cta"
+   */
+  const articleGrids = document.querySelectorAll(".articles_collection-list");
+  if (articleGrids.length > 0) {
+    console.log("Article grids found:", articleGrids.length);
+    articleGrids.forEach((grid) => {
+      const articleItems = grid.querySelectorAll("[data-component-name='article grid']");
+      articleItems.forEach((item, index) => {
+        if (index === 0) {
+          item.setAttribute("data-link-type", "primary cta");
+        } else {
+          item.setAttribute("data-link-type", "secondary cta");
+        }
+      });
+    });
+  }
 
   // Outcome tracking for all declared forms
   initOutcomeTrackingOnAllForms({
