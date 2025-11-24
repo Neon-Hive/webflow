@@ -262,7 +262,7 @@ function ensureProviderMarker() {
   const firstCtaMarker = paragraphs.find((p) => p.textContent.trim() === "{{cta-block}}");
   if (!firstCtaMarker) return;
 
-  const fallbackIndex = Math.min(4, paragraphs.length - 1); // TODO: control the count of how deep the marker should be inserted
+  const fallbackIndex = Math.min(7, paragraphs.length - 1); // TODO: control the count of how deep the marker should be inserted
   const fallbackParagraph = paragraphs[fallbackIndex];
   const insertionTarget =
     paragraphs.indexOf(firstCtaMarker) >= fallbackIndex ? firstCtaMarker : fallbackParagraph;
