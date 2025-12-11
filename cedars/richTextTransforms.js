@@ -151,6 +151,13 @@ function handleCtaBlocks() {
 }
 
 function showCtaBlocks() {
+  // Clean up any existing mobile clones first
+  const existingMobileCtas = document.querySelectorAll(".is-mobile-cta");
+  existingMobileCtas.forEach((cta) => cta.remove());
+  document.querySelectorAll("[data-mobile-cloned]").forEach((item) => {
+    item.removeAttribute("data-mobile-cloned");
+  });
+
   const regularCtaItems = Array.from(document.querySelectorAll("[data-cta-type='cta']"));
   const providerListWrapper = document.querySelector("[data-cta-type='provider-list']");
   const ctaBlockMarkers = Array.from(document.querySelectorAll("p")).filter(
@@ -158,33 +165,37 @@ function showCtaBlocks() {
   );
 
   // Display one CTA per marker (1:1 mapping)
-  let ctaIndex = 0;
+  ctaBlockMarkers.forEach((marker, index) => {
+    if (index < regularCtaItems.length) {
+      const regularItem = regularCtaItems[index];
+      if (regularItem) {
+        const clonedCta = regularItem.cloneNode(true);
+        clonedCta.classList.add("is-mobile-cta");
+        clonedCta.removeAttribute("data-cta-type");
 
-  document.querySelectorAll("p").forEach((p) => {
-    const text = p.textContent.trim();
+        clonedCta.style.position = "";
+        clonedCta.style.left = "";
+        clonedCta.style.right = "";
+        clonedCta.style.top = "";
+        clonedCta.style.zIndex = "";
 
-    if (text === "{{cta-block}}") {
-      const markerIndex = ctaBlockMarkers.indexOf(p);
-      if (markerIndex >= 0 && ctaIndex < regularCtaItems.length) {
-        const regularItem = regularCtaItems[ctaIndex];
-        if (regularItem && !regularItem.hasAttribute("data-mobile-cloned")) {
-          const clonedCta = regularItem.cloneNode(true);
-          clonedCta.classList.add("is-mobile-cta");
-          clonedCta.removeAttribute("data-cta-type");
-
-          clonedCta.style.position = "";
-          clonedCta.style.left = "";
-          clonedCta.style.right = "";
-          clonedCta.style.top = "";
-          clonedCta.style.zIndex = "";
-
-          p.parentNode.insertBefore(clonedCta, p.nextSibling);
-          regularItem.setAttribute("data-mobile-cloned", "true");
-          ctaIndex++;
-        }
+        marker.parentNode.insertBefore(clonedCta, marker.nextSibling);
+        regularItem.setAttribute("data-mobile-cloned", "true");
       }
     }
+  });
 
+  // Remove all CTAs that weren't cloned (when there are fewer markers than CTAs)
+  // This prevents them from coming back on resize
+  regularCtaItems.forEach((item, index) => {
+    if (index >= ctaBlockMarkers.length) {
+      item.remove();
+    }
+  });
+
+  // Handle providers
+  document.querySelectorAll("p").forEach((p) => {
+    const text = p.textContent.trim();
     if (text === "{{providers}}") {
       if (providerListWrapper && !providerListWrapper.hasAttribute("data-mobile-cloned")) {
         const clonedProviders = providerListWrapper.cloneNode(true);
@@ -200,6 +211,15 @@ function showCtaBlocks() {
         p.parentNode.insertBefore(clonedProviders, p.nextSibling);
         providerListWrapper.setAttribute("data-mobile-cloned", "true");
       }
+    }
+  });
+
+  // Hide all markers
+  document.querySelectorAll("p").forEach((p) => {
+    const text = p.textContent.trim();
+    if (text === "{{cta-block}}" || text === "{{providers}}") {
+      p.style.visibility = "hidden";
+      p.style.marginBottom = "-2rem";
     }
   });
 }
@@ -232,12 +252,13 @@ function ensureCtaMarker() {
   const richText = document.querySelector("[data-n4-rich-text='true']");
   if (!richText) return;
 
+  // Check if marker already exists (including hidden ones)
   const hasMarker = Array.from(richText.querySelectorAll("p")).some(
     (p) => p.textContent.trim() === "{{cta-block}}",
   );
   if (hasMarker) return;
 
-  // Insert marker at the very top of the article
+  // Insert single marker at the very top - ensures only first CTA shows (1:1 mapping)
   const marker = document.createElement("p");
   marker.textContent = "{{cta-block}}";
   marker.setAttribute("data-generated-cta-marker", "true");
@@ -328,6 +349,13 @@ function initializeCtaScrollTrigger() {
     }
   });
 
+  // Remove all CTAs that don't have markers assigned - This prevents them from coming back on resize
+  ctaItems.forEach((item) => {
+    if (!item.marker) {
+      item.element.remove();
+    }
+  });
+
   const itemsWithMarkers = allItems.filter((item) => item.marker);
 
   itemsWithMarkers.sort((a, b) => {
@@ -340,6 +368,11 @@ function initializeCtaScrollTrigger() {
 
   if (allItemsToMove.length === 0) {
     return;
+  }
+
+  // Clean up container first - remove all existing items
+  while (ctaListContainer.firstChild) {
+    ctaListContainer.removeChild(ctaListContainer.firstChild);
   }
 
   allItemsToMove.forEach((item) => {
