@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!richText) return;
 
   handleRichTextColumns();
+  ensureCtaMarker();
   ensureProviderMarker();
   handleCtaBlocks();
 
@@ -42,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     handleRichTextColumns();
+    ensureCtaMarker();
     ensureProviderMarker();
   });
 });
@@ -136,6 +138,7 @@ function handleRichTextColumns() {
 }
 
 function handleCtaBlocks() {
+  ensureCtaMarker();
   ensureProviderMarker();
   // Mobile: show CTAs inline; Desktop: use sticky positioning
   const isMobile = window.innerWidth <= 991;
@@ -222,6 +225,25 @@ function hideCtaBlocks() {
 
 const providerScrollTriggers = [];
 
+function ensureCtaMarker() {
+  const regularCtaItems = document.querySelectorAll("[data-cta-type='cta']");
+  if (!regularCtaItems.length) return;
+
+  const richText = document.querySelector("[data-n4-rich-text='true']");
+  if (!richText) return;
+
+  const hasMarker = Array.from(richText.querySelectorAll("p")).some(
+    (p) => p.textContent.trim() === "{{cta-block}}",
+  );
+  if (hasMarker) return;
+
+  // Insert marker at the very top of the article
+  const marker = document.createElement("p");
+  marker.textContent = "{{cta-block}}";
+  marker.setAttribute("data-generated-cta-marker", "true");
+  richText.insertBefore(marker, richText.firstChild);
+}
+
 function ensureProviderMarker() {
   const providerList = document.querySelector("[data-cta-type='provider-list']");
   if (!providerList) return;
@@ -255,6 +277,7 @@ function ensureProviderMarker() {
 function initializeCtaScrollTrigger() {
   const ctaListContainer = document.querySelector("[data-cta-list]");
   if (!ctaListContainer) return;
+  ensureCtaMarker();
   ensureProviderMarker();
 
   const regularCtaItems = Array.from(document.querySelectorAll("[data-cta-type='cta']"));
