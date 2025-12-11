@@ -137,6 +137,7 @@ function handleRichTextColumns() {
 
 function handleCtaBlocks() {
   ensureProviderMarker();
+  // Mobile: show CTAs inline; Desktop: use sticky positioning
   const isMobile = window.innerWidth <= 991;
 
   if (isMobile) {
@@ -153,41 +154,17 @@ function showCtaBlocks() {
     (p) => p.textContent.trim() === "{{cta-block}}",
   );
 
+  // Display one CTA per marker (1:1 mapping)
+  let ctaIndex = 0;
+
   document.querySelectorAll("p").forEach((p) => {
     const text = p.textContent.trim();
 
     if (text === "{{cta-block}}") {
-      if (ctaBlockMarkers.length === 1 && regularCtaItems.length >= 2) {
-        const wrapper = document.createElement("div");
-        wrapper.style.display = "flex";
-        wrapper.style.flexDirection = "column";
-        wrapper.style.gap = "2rem";
-        wrapper.classList.add("is-mobile-cta");
-
-        regularCtaItems.forEach((item) => {
-          if (!item.hasAttribute("data-mobile-cloned")) {
-            const clonedCta = item.cloneNode(true);
-            clonedCta.removeAttribute("data-cta-type");
-            clonedCta.style.position = "";
-            clonedCta.style.left = "";
-            clonedCta.style.right = "";
-            clonedCta.style.top = "";
-            clonedCta.style.zIndex = "";
-
-            wrapper.appendChild(clonedCta);
-            item.setAttribute("data-mobile-cloned", "true");
-          }
-        });
-
-        if (wrapper.children.length > 0) {
-          p.parentNode.insertBefore(wrapper, p.nextSibling);
-        }
-      } else {
-        const regularItem = regularCtaItems.find(
-          (item) => !item.hasAttribute("data-mobile-cloned"),
-        );
-
-        if (regularItem) {
+      const markerIndex = ctaBlockMarkers.indexOf(p);
+      if (markerIndex >= 0 && ctaIndex < regularCtaItems.length) {
+        const regularItem = regularCtaItems[ctaIndex];
+        if (regularItem && !regularItem.hasAttribute("data-mobile-cloned")) {
           const clonedCta = regularItem.cloneNode(true);
           clonedCta.classList.add("is-mobile-cta");
           clonedCta.removeAttribute("data-cta-type");
@@ -200,6 +177,7 @@ function showCtaBlocks() {
 
           p.parentNode.insertBefore(clonedCta, p.nextSibling);
           regularItem.setAttribute("data-mobile-cloned", "true");
+          ctaIndex++;
         }
       }
     }
@@ -262,7 +240,8 @@ function ensureProviderMarker() {
   const firstCtaMarker = paragraphs.find((p) => p.textContent.trim() === "{{cta-block}}");
   if (!firstCtaMarker) return;
 
-  const fallbackIndex = Math.min(7, paragraphs.length - 1); // TODO: control the count of how deep the marker should be inserted
+  // Insert marker at least 3 paragraphs deep to avoid overlap with first CTA
+  const fallbackIndex = Math.min(4, paragraphs.length - 1);
   const fallbackParagraph = paragraphs[fallbackIndex];
   const insertionTarget =
     paragraphs.indexOf(firstCtaMarker) >= fallbackIndex ? firstCtaMarker : fallbackParagraph;
@@ -318,46 +297,15 @@ function initializeCtaScrollTrigger() {
   });
 
   const ctaItems = allItems.filter((item) => item.type === "cta");
-  const providerListItems = allItems.filter((item) => item.type === "provider-list");
 
-  let ctaWrapper = null;
-  let shouldWrapCtas = false;
+  // Assign one CTA per marker (1:1 mapping)
+  ctaItems.forEach((item, index) => {
+    if (index < ctaBlockMarkers.length) {
+      item.marker = ctaBlockMarkers[index];
+    }
+  });
 
-  if (ctaBlockMarkers.length === 1 && ctaItems.length >= 2) {
-    shouldWrapCtas = true;
-    const wrapperElement = document.createElement("div");
-    wrapperElement.style.display = "flex";
-    wrapperElement.style.flexDirection = "column";
-    wrapperElement.style.gap = "2rem";
-
-    ctaWrapper = {
-      element: wrapperElement,
-      type: "cta-wrapper",
-      marker: ctaBlockMarkers[0],
-      height: null,
-    };
-  } else if (ctaBlockMarkers.length === 1) {
-    ctaItems.forEach((item) => {
-      item.marker = ctaBlockMarkers[0];
-    });
-  } else if (ctaBlockMarkers.length > 1) {
-    ctaItems.forEach((item, index) => {
-      if (index < ctaBlockMarkers.length) {
-        item.marker = ctaBlockMarkers[index];
-      } else {
-        item.marker = ctaBlockMarkers[0];
-      }
-    });
-  }
-
-  let itemsWithMarkers = allItems.filter((item) => item.marker);
-  let itemsWithoutMarkers = allItems.filter((item) => !item.marker);
-
-  if (shouldWrapCtas && ctaWrapper) {
-    itemsWithMarkers = itemsWithMarkers.filter((item) => item.type !== "cta");
-    itemsWithoutMarkers = itemsWithoutMarkers.filter((item) => item.type !== "cta");
-    itemsWithMarkers.push(ctaWrapper);
-  }
+  const itemsWithMarkers = allItems.filter((item) => item.marker);
 
   itemsWithMarkers.sort((a, b) => {
     const aTop = a.marker.getBoundingClientRect().top + window.pageYOffset;
@@ -365,45 +313,26 @@ function initializeCtaScrollTrigger() {
     return aTop - bTop;
   });
 
-  const allItemsToMove = [...itemsWithMarkers, ...itemsWithoutMarkers];
+  const allItemsToMove = itemsWithMarkers;
 
   if (allItemsToMove.length === 0) {
     return;
   }
 
   allItemsToMove.forEach((item) => {
-    if (item.type === "cta-wrapper" && ctaWrapper) {
-      ctaItems.forEach((ctaItem) => {
-        ctaWrapper.element.appendChild(ctaItem.element);
-        ctaItem.element.style.position = "";
-        ctaItem.element.style.left = "";
-        ctaItem.element.style.right = "";
-        ctaItem.element.style.top = "";
-        ctaItem.element.style.zIndex = "";
-      });
-      ctaListContainer.appendChild(ctaWrapper.element);
-    } else {
-      ctaListContainer.appendChild(item.element);
-    }
+    ctaListContainer.appendChild(item.element);
   });
 
   allItemsToMove.forEach((item, index) => {
-    if (item.type === "cta-wrapper") {
-      item.element.style.position = "absolute";
-      item.element.style.left = "0";
-      item.element.style.right = "0";
-      item.element.style.zIndex = allItemsToMove.length - index;
-    } else {
-      item.element.style.position = "absolute";
-      item.element.style.left = "0";
-      item.element.style.right = "0";
-      item.element.style.zIndex = allItemsToMove.length - index;
-    }
+    item.element.style.position = "absolute";
+    item.element.style.left = "0";
+    item.element.style.right = "0";
+    item.element.style.zIndex = allItemsToMove.length - index;
   });
 
   setTimeout(() => {
     allItemsToMove.forEach((item) => {
-      if (item.type === "provider-list" || item.type === "cta-wrapper") {
+      if (item.type === "provider-list") {
         item.height = item.element.offsetHeight;
       }
     });
@@ -413,11 +342,12 @@ function initializeCtaScrollTrigger() {
   function updateCtaPositions() {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const stickyTop = 56;
+    const gap = 32;
 
     const containerRect = ctaListContainer.getBoundingClientRect();
     const containerTop = containerRect.top + scrollTop;
-    const gap = 32;
 
+    // Group items by their marker
     const itemsByMarker = new Map();
     itemsWithMarkers.forEach((item) => {
       const markerKey = item.marker;
@@ -427,117 +357,65 @@ function initializeCtaScrollTrigger() {
       itemsByMarker.get(markerKey).push(item);
     });
 
+    // Sort markers by position in document
     const markerGroups = Array.from(itemsByMarker.entries()).sort((a, b) => {
       const aTop = a[0].getBoundingClientRect().top + window.pageYOffset;
       const bTop = b[0].getBoundingClientRect().top + window.pageYOffset;
       return aTop - bTop;
     });
 
+    // Track bottom of previous item to prevent overlap
+    let previousBottom = Number.NEGATIVE_INFINITY;
+
     markerGroups.forEach(([marker, items], groupIndex) => {
       const markerRect = marker.getBoundingClientRect();
       const markerTop = markerRect.top + scrollTop;
       const markerRelativeToContainer = markerTop - containerTop;
 
-      const wrapperItem = items.find((item) => item.type === "cta-wrapper");
+      const item = items[0];
+      if (!item) return;
 
-      if (wrapperItem) {
-        const wrapperHeight = wrapperItem.height || wrapperItem.element.offsetHeight;
+      const itemHeight = item.height || item.element.offsetHeight;
+      let desiredTop = markerRelativeToContainer;
+      let shouldBeSticky = false;
 
-        wrapperItem.element.style.left = "0";
-        wrapperItem.element.style.right = "0";
+      if (scrollTop + stickyTop >= markerTop) {
+        const nextGroup = markerGroups[groupIndex + 1];
+        if (nextGroup) {
+          const nextMarkerTop = nextGroup[0].getBoundingClientRect().top + scrollTop;
+          const distanceToNext = nextMarkerTop - (scrollTop + stickyTop);
 
-        if (scrollTop + stickyTop >= markerTop) {
-          const nextGroup = markerGroups[groupIndex + 1];
-          if (nextGroup) {
-            const nextMarkerTop = nextGroup[0].getBoundingClientRect().top + scrollTop;
-            const distanceToNext = nextMarkerTop - (scrollTop + stickyTop);
-
-            if (distanceToNext <= wrapperHeight + gap) {
-              const nextMarkerRelativeToContainer = nextMarkerTop - containerTop;
-              wrapperItem.element.style.position = "absolute";
-              wrapperItem.element.style.top =
-                nextMarkerRelativeToContainer - wrapperHeight - gap + "px";
-            } else {
-              wrapperItem.element.style.position = "sticky";
-              wrapperItem.element.style.top = stickyTop + "px";
-            }
+          if (distanceToNext <= itemHeight + gap) {
+            const nextMarkerRelativeToContainer = nextMarkerTop - containerTop;
+            desiredTop = nextMarkerRelativeToContainer - itemHeight - gap;
+            shouldBeSticky = false;
           } else {
-            wrapperItem.element.style.position = "sticky";
-            wrapperItem.element.style.top = stickyTop + "px";
+            const stickyPositionInContainer = scrollTop + stickyTop - containerTop;
+            desiredTop = stickyPositionInContainer;
+            shouldBeSticky = true;
           }
         } else {
-          wrapperItem.element.style.position = "absolute";
-          wrapperItem.element.style.top = Math.max(0, markerRelativeToContainer) + "px";
+          const stickyPositionInContainer = scrollTop + stickyTop - containerTop;
+          desiredTop = stickyPositionInContainer;
+          shouldBeSticky = true;
         }
+      }
+
+      // Prevent overlap: push item down if it would overlap with previous item
+      const minTop = previousBottom + gap;
+      const wouldOverlap = desiredTop < minTop;
+      const finalTop = Math.max(desiredTop, minTop, 0);
+
+      if (shouldBeSticky && !wouldOverlap) {
+        item.element.style.position = "sticky";
+        item.element.style.top = stickyTop + "px";
+        previousBottom = scrollTop + stickyTop + itemHeight - containerTop;
       } else {
-        let stackTop = markerRelativeToContainer;
-        items.forEach((item, itemIndex) => {
-          const itemHeight = item.height || item.element.offsetHeight;
-          const isFirstInStack = itemIndex === 0;
-
-          if (scrollTop + stickyTop >= markerTop) {
-            const nextGroup = markerGroups[groupIndex + 1];
-            if (nextGroup && isFirstInStack) {
-              const nextMarkerTop = nextGroup[0].getBoundingClientRect().top + scrollTop;
-              const distanceToNext = nextMarkerTop - (scrollTop + stickyTop);
-              const totalStackHeight =
-                items.reduce((sum, i) => sum + (i.height || i.element.offsetHeight), 0) +
-                (items.length - 1) * gap;
-
-              if (distanceToNext <= totalStackHeight + gap) {
-                const nextMarkerRelativeToContainer = nextMarkerTop - containerTop;
-                item.element.style.position = "absolute";
-                item.element.style.top =
-                  nextMarkerRelativeToContainer -
-                  totalStackHeight -
-                  gap +
-                  (stackTop - markerRelativeToContainer) +
-                  "px";
-              } else {
-                item.element.style.position = isFirstInStack ? "sticky" : "absolute";
-                item.element.style.top = isFirstInStack ? stickyTop + "px" : stackTop + "px";
-              }
-            } else {
-              item.element.style.position = isFirstInStack ? "sticky" : "absolute";
-              item.element.style.top = isFirstInStack ? stickyTop + "px" : stackTop + "px";
-            }
-          } else {
-            item.element.style.position = "absolute";
-            item.element.style.top = stackTop + "px";
-          }
-
-          stackTop += itemHeight + gap;
-        });
+        item.element.style.position = "absolute";
+        item.element.style.top = finalTop + "px";
+        previousBottom = finalTop + itemHeight;
       }
     });
-
-    if (itemsWithoutMarkers.length > 0 && markerGroups.length > 0) {
-      const firstMarker = markerGroups[0][0];
-      const firstMarkerItems = markerGroups[0][1];
-      const firstMarkerRect = firstMarker.getBoundingClientRect();
-      const firstMarkerTop = firstMarkerRect.top + scrollTop;
-      const firstMarkerRelativeToContainer = firstMarkerTop - containerTop;
-
-      let stackTop = firstMarkerRelativeToContainer;
-      firstMarkerItems.forEach((item) => {
-        stackTop += (item.height || item.element.offsetHeight) + gap;
-      });
-
-      itemsWithoutMarkers.forEach((item) => {
-        const itemHeight = item.height || item.element.offsetHeight;
-        item.element.style.position = "absolute";
-        item.element.style.top = stackTop + "px";
-        stackTop += itemHeight + gap;
-      });
-    } else if (itemsWithoutMarkers.length > 0) {
-      let stackTop = 0;
-      itemsWithoutMarkers.forEach((item) => {
-        const itemHeight = item.height || item.element.offsetHeight;
-        item.element.style.position = "absolute";
-        item.element.style.top = stackTop + "px";
-        stackTop += itemHeight + gap;
-      });
-    }
   }
 
   window.currentUpdateFunction = updateCtaPositions;
