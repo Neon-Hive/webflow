@@ -86,6 +86,51 @@ function getUserECID() {
   return undefined;
 }
 
+// Get component title with fallback to data-component-title-value ==============================
+function getComponentTitle(element) {
+  // First try to find data-component-title
+  const titleElement = element.closest("[data-component-title]");
+  if (titleElement) {
+    return toPlainLower(titleElement.getAttribute("data-component-title") || "");
+  }
+
+  // Fallback to data-component-title-value - search up the tree and within parent containers
+  let current = element;
+  while (current && current !== document.body) {
+    // Check if current element has the attribute
+    if (current.hasAttribute && current.hasAttribute("data-component-title-value")) {
+      const value = current.getAttribute("data-component-title-value");
+      const text = (current.textContent || "").trim();
+      if (value && value.trim()) {
+        return toPlainLower(value.trim());
+      }
+      if (text) {
+        return toPlainLower(text);
+      }
+    }
+
+    // Check within parent container for siblings/children with the attribute
+    if (current.parentElement) {
+      const valueElement = current.parentElement.querySelector("[data-component-title-value]");
+      if (valueElement) {
+        const value = valueElement.getAttribute("data-component-title-value");
+        const text = (valueElement.textContent || "").trim();
+        if (value && value.trim()) {
+          return toPlainLower(value.trim());
+        }
+        if (text) {
+          return toPlainLower(text);
+        }
+      }
+    }
+
+    // Move up the tree
+    current = current.parentElement;
+  }
+
+  return "";
+}
+
 // Wait for Visitor API to be ready and return ECID
 function getUserECIDAsync(maxWaitMs = 5000, pollIntervalMs = 100) {
   return new Promise((resolve) => {
@@ -182,9 +227,7 @@ function handleAnalyticsClick(event) {
   const componentName = (
     clickedElement.closest("[data-component-name]")?.getAttribute("data-component-name") || ""
   ).toLowerCase();
-  const componentTitle = toPlainLower(
-    clickedElement.closest("[data-component-title]")?.getAttribute("data-component-title") || "",
-  );
+  const componentTitle = getComponentTitle(clickedElement);
   const linkAction = (clickedElement.getAttribute("data-link-action") || "link").toLowerCase();
   const linkType =
     clickedElement.closest("[data-link-type]")?.getAttribute("data-link-type") ||
@@ -241,7 +284,7 @@ function handleAnalyticsClick(event) {
       isExternalLink: isExternal,
       linkAction: "link",
       linkText: relatedArticleText,
-      section: sectionTag,
+      ...(componentTitle.toLowerCase() !== "view all" && { section: sectionTag }), // Don't pass section for view all
       linkType: "cta",
       eventTimestamp: Date.now(),
     };
