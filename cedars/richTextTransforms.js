@@ -193,26 +193,28 @@ function showCtaBlocks() {
     }
   });
 
-  // Handle providers
-  document.querySelectorAll("p").forEach((p) => {
-    const text = p.textContent.trim();
-    if (text === "{{providers}}") {
-      if (providerListWrapper && !providerListWrapper.hasAttribute("data-mobile-cloned")) {
-        const clonedProviders = providerListWrapper.cloneNode(true);
-        clonedProviders.classList.add("is-mobile-cta");
-        clonedProviders.removeAttribute("data-cta-type");
+  // Handle providers (only if valid)
+  if (hasValidProviders(providerListWrapper)) {
+    document.querySelectorAll("p").forEach((p) => {
+      const text = p.textContent.trim();
+      if (text === "{{providers}}") {
+        if (providerListWrapper && !providerListWrapper.hasAttribute("data-mobile-cloned")) {
+          const clonedProviders = providerListWrapper.cloneNode(true);
+          clonedProviders.classList.add("is-mobile-cta");
+          clonedProviders.removeAttribute("data-cta-type");
 
-        clonedProviders.style.position = "";
-        clonedProviders.style.left = "";
-        clonedProviders.style.right = "";
-        clonedProviders.style.top = "";
-        clonedProviders.style.zIndex = "";
+          clonedProviders.style.position = "";
+          clonedProviders.style.left = "";
+          clonedProviders.style.right = "";
+          clonedProviders.style.top = "";
+          clonedProviders.style.zIndex = "";
 
-        p.parentNode.insertBefore(clonedProviders, p.nextSibling);
-        providerListWrapper.setAttribute("data-mobile-cloned", "true");
+          p.parentNode.insertBefore(clonedProviders, p.nextSibling);
+          providerListWrapper.setAttribute("data-mobile-cloned", "true");
+        }
       }
-    }
-  });
+    });
+  }
 
   // Hide all markers
   document.querySelectorAll("p").forEach((p) => {
@@ -245,6 +247,14 @@ function hideCtaBlocks() {
 
 const providerScrollTriggers = [];
 
+function hasValidProviders(providerListWrapper) {
+  if (!providerListWrapper) return false;
+  // Check if provider list has actual items (not empty state)
+  const emptyState = providerListWrapper.querySelector(".w-dyn-empty, .provider_empty-state");
+  const hasItems = providerListWrapper.querySelector(".provider-cta_item");
+  return !emptyState && hasItems;
+}
+
 function ensureCtaMarker() {
   const regularCtaItems = document.querySelectorAll("[data-cta-type='cta']");
   if (!regularCtaItems.length) return;
@@ -267,10 +277,18 @@ function ensureCtaMarker() {
 
 function ensureProviderMarker() {
   const providerList = document.querySelector("[data-cta-type='provider-list']");
-  if (!providerList) return;
-
   const richText = document.querySelector("[data-n4-rich-text='true']");
   if (!richText) return;
+
+  // Remove existing provider markers if providers are empty or don't exist
+  if (!providerList || !hasValidProviders(providerList)) {
+    richText.querySelectorAll("p").forEach((p) => {
+      if (p.textContent.trim() === "{{providers}}") {
+        p.remove();
+      }
+    });
+    return;
+  }
 
   const hasMarker = Array.from(richText.querySelectorAll("p")).some(
     (p) => p.textContent.trim() === "{{providers}}",
@@ -283,16 +301,12 @@ function ensureProviderMarker() {
   const firstCtaMarker = paragraphs.find((p) => p.textContent.trim() === "{{cta-block}}");
   if (!firstCtaMarker) return;
 
-  // Insert marker at least 3 paragraphs deep to avoid overlap with first CTA
-  const fallbackIndex = Math.min(4, paragraphs.length - 1);
-  const fallbackParagraph = paragraphs[fallbackIndex];
-  const insertionTarget =
-    paragraphs.indexOf(firstCtaMarker) >= fallbackIndex ? firstCtaMarker : fallbackParagraph;
-
+  // Insert provider marker at the very top of the articles
+  // Both providers and CTAs will stack properly via the scroll positioning logic
   const marker = document.createElement("p");
   marker.textContent = "{{providers}}";
   marker.setAttribute("data-generated-provider-marker", "true");
-  insertionTarget.parentNode.insertBefore(marker, insertionTarget.nextSibling);
+  richText.insertBefore(marker, richText.firstChild);
 }
 
 function initializeCtaScrollTrigger() {
@@ -315,7 +329,7 @@ function initializeCtaScrollTrigger() {
     });
   });
 
-  if (providerListWrapper) {
+  if (providerListWrapper && hasValidProviders(providerListWrapper)) {
     allItems.push({
       element: providerListWrapper,
       type: "provider-list",
@@ -441,12 +455,14 @@ function initializeCtaScrollTrigger() {
           const nextMarkerTop = nextGroup[0].getBoundingClientRect().top + scrollTop;
           const distanceToNext = nextMarkerTop - (scrollTop + stickyTop);
 
+          const stickyPositionInContainer = scrollTop + stickyTop - containerTop;
           if (distanceToNext <= itemHeight + gap) {
             const nextMarkerRelativeToContainer = nextMarkerTop - containerTop;
-            desiredTop = nextMarkerRelativeToContainer - itemHeight - gap;
+            const positionAboveNext = nextMarkerRelativeToContainer - itemHeight - gap;
+            // When making room for next item, scroll this item back to its marker
+            desiredTop = Math.max(positionAboveNext, markerRelativeToContainer);
             shouldBeSticky = false;
           } else {
-            const stickyPositionInContainer = scrollTop + stickyTop - containerTop;
             desiredTop = stickyPositionInContainer;
             shouldBeSticky = true;
           }
