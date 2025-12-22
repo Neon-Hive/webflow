@@ -51,7 +51,7 @@ async function fetchAutocomplete(inputText) {
 
 	const body = {
 		input: inputText,
-		includedRegionCodes: ["US", "CA"], // Restricts to US & Canada
+		includedRegionCodes: ["AU"], // Restricts to Australia
 	};
 
 	const response = await fetch(url, {
