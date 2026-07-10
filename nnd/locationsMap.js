@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   input.dataset.lng = lng;
                 }
               } else {
-                showError("❌ Unable to retrieve address from your location.");
+                showError("Unable to retrieve address from your location.");
               }
 
               // Automatically center & re-fit map when location is found
@@ -246,13 +246,13 @@ document.addEventListener("DOMContentLoaded", function () {
               resolve({ lat, lng });
             } catch (error) {
               console.error("❌ Error fetching address:", error);
-              showError("❌ Unable to retrieve address from your location.");
+              showError("Unable to retrieve address from your location.");
               resolve(null);
             }
           },
           (error) => {
             console.error("❌ Geolocation error:", error);
-            showError("❌ Unable to get your location. Please enable location services.");
+            showError("Unable to get your location. Please enable location services.");
             resolve(null);
           }
         );
@@ -266,8 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Function to get an address from latitude & longitude (Google Maps Geocoder)
   async function getAddressFromCoordinates(lat, lng) {
     try {
-      await loadGoogleMapsAPI(); // ✅ Ensure Google API is loaded
-
+      await loadGoogleMapsAPI();
       if (!google.maps.Geocoder) {
         console.error("❌ Google Maps Geocoder is not available.");
         return null;
