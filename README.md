@@ -12,4 +12,12 @@ Add defer/async or other params as needed :)
 ## CDN Cache
 Use https://www.jsdelivr.com/tools/purge to purge cache on the CDN to avoid waiting 15-20mins between changes
 
+Or purge a single file directly by opening its purge URL in the browser (same path as the CDN URL, `cdn` → `purge`):
+
+https://purge.jsdelivr.net/gh/Neon-Hive/webflow/nnd/locationsMap.min.js
+
+General form:
+
+https://purge.jsdelivr.net/gh/Neon-Hive/webflow/< YOUR_FOLDER >/< YOUR_SCRIPT >.min.js
+
 

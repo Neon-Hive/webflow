@@ -544,6 +544,7 @@ document.addEventListener("DOMContentLoaded", () => {
       mapTypeId: "roadmap",
       zoom: 12,
       gestureHandling: window.innerWidth <= 425 ? "greedy" : "auto",
+      clickableIcons: false, // Suppress Google's default POI/place info window on clicks
       disableDefaultUI: true,
       zoomControl: true,
       streetViewControl: false,
