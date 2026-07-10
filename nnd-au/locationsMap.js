@@ -1,3 +1,5 @@
+// TODO: We need to refactor these to the new NND US methods
+
 // Handle locationData from cms load. Needed to get more than 100+ items
 window.fsAttributes = window.fsAttributes || [];
 window.locationData = window.locationData || []; // Store location data globally

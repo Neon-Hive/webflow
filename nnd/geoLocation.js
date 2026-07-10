@@ -1,20 +1,38 @@
+// Console logging is restricted to the staging environment to reduce prod noise
+const GEO_IS_STAGING =
+  window.location.hostname === "nursenextdoor-staging.webflow.io";
+const GEO_LOG_PREFIX = "[GeoLocation]";
+
+const geoLogger = {
+  log: (...args) => {
+    if (GEO_IS_STAGING) console.log(GEO_LOG_PREFIX, ...args);
+  },
+  info: (...args) => {
+    if (GEO_IS_STAGING) console.info(GEO_LOG_PREFIX, ...args);
+  },
+  warn: (...args) => {
+    if (GEO_IS_STAGING) console.warn(GEO_LOG_PREFIX, ...args);
+  },
+  error: (...args) => {
+    if (GEO_IS_STAGING) console.error(GEO_LOG_PREFIX, ...args);
+  },
+};
+
 // Ensure Google Maps API is fully loaded (for geocoding fallback)
 async function loadGoogleMapsAPI() {
-  if (!window.google || !google.maps || !google.maps.Geocoder) {
+  if (!window.google?.maps?.Geocoder) {
     return new Promise((resolve, reject) => {
-      if (window.google && google.maps && google.maps.Geocoder) {
-        return resolve();
-      }
-
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo&libraries=places`;
+      script.src =
+        "https://maps.googleapis.com/maps/api/js?key=AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo&libraries=places";
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        console.log("✅ Google Maps API Loaded");
+        geoLogger.log("Google Maps API loaded");
         resolve();
       };
-      script.onerror = () => reject(new Error("❌ Google Maps API failed to load"));
+      script.onerror = () =>
+        reject(new Error("Google Maps API failed to load"));
 
       document.head.appendChild(script);
     });
@@ -150,10 +168,10 @@ function updateFindButtonState() {
 // Function to get an address from latitude & longitude (Google Maps Geocoder)
 async function getAddressFromCoordinates(lat, lng) {
   try {
-    await loadGoogleMapsAPI(); // ✅ Ensure Google API is loaded
+    await loadGoogleMapsAPI(); // Ensure Google API is loaded
 
     if (!google.maps.Geocoder) {
-      console.error("❌ Google Maps Geocoder is not available.");
+      geoLogger.error("Google Maps Geocoder is not available");
       return null;
     }
 
@@ -162,16 +180,16 @@ async function getAddressFromCoordinates(lat, lng) {
       geocoder.geocode({ location: { lat, lng } }, (results, status) => {
         if (status === "OK" && results.length > 0) {
           const address = results[0].formatted_address;
-          console.log("✅ Address from Coordinates:", address);
+          geoLogger.log("Address from coordinates:", address);
           resolve(address);
         } else {
-          console.error("❌ No address found or geocoding failed:", status);
+          geoLogger.error("No address found or geocoding failed:", status);
           reject("Unable to retrieve address.");
         }
       });
     });
   } catch (error) {
-    console.error("❌ Error in getAddressFromCoordinates:", error);
+    geoLogger.error("Error in getAddressFromCoordinates:", error);
     return null;
   }
 }
@@ -179,7 +197,7 @@ async function getAddressFromCoordinates(lat, lng) {
 // Function to get the user's current location and update the address input
 async function getUserLocation() {
   if (!navigator.geolocation) {
-    showError("❌ Geolocation is not supported by your browser.");
+    showError("Geolocation is not supported by your browser.");
     return;
   }
 
@@ -187,30 +205,32 @@ async function getUserLocation() {
     async (position) => {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
-      console.log("📍 User's Location:", lat, lng);
+      geoLogger.log("User location:", lat, lng);
 
       try {
         const address = await getAddressFromCoordinates(lat, lng);
         if (address) {
           const input = document.getElementById("geo-address");
           if (input) {
-            input.value = address; // ✅ Set address in input field
+            input.value = address; // Set address in input field
             input.dataset.lat = lat;
             input.dataset.lng = lng;
             updateFindButtonState();
           }
         } else {
-          showError("❌ Unable to retrieve address from your location.");
+          showError("Unable to retrieve address from your location.");
         }
       } catch (error) {
-        console.error("❌ Error fetching address:", error);
-        showError("❌ Unable to retrieve address from your location.");
+        geoLogger.error("Error fetching address:", error);
+        showError("Unable to retrieve address from your location.");
       }
     },
     (error) => {
-      console.error("❌ Geolocation error:", error);
-      showError("❌ Unable to get your location. Please enable location services.");
-    }
+      geoLogger.error("Geolocation error:", error);
+      showError(
+        "Unable to get your location. Please enable location services.",
+      );
+    },
   );
 }
 
@@ -220,7 +240,7 @@ function initNewAutocomplete() {
   if (!input) return;
   input.addEventListener(
     "input",
-    debounce(async function () {
+    debounce(async () => {
       const query = input.value.trim();
       if (!query) {
         const container = document.getElementById("autocomplete-results");
@@ -233,15 +253,15 @@ function initNewAutocomplete() {
           displaySuggestions(data.suggestions);
         }
       } catch (error) {
-        console.error("Autocomplete error:", error);
+        geoLogger.error("Autocomplete error:", error);
       }
-    }, 300)
+    }, 300),
   );
 }
 
 // Show an error message below the g_location_form_input_wrap container
 function showError(message) {
-  let errorDiv = document.getElementById("address-error");
+  const errorDiv = document.getElementById("address-error");
   if (errorDiv) {
     errorDiv.textContent = message;
     errorDiv.style.display = "block";
@@ -258,7 +278,8 @@ function hideError() {
 }
 
 // "Find" button: when clicked, use Place Details to get lat/lng then redirect
-document.getElementById("find-btn").addEventListener("click", async (event) => {
+const findButton = document.getElementById("find-btn");
+findButton?.addEventListener("click", async (event) => {
   event.preventDefault();
   const input = document.getElementById("geo-address");
   const address = input.value.trim();
@@ -267,7 +288,7 @@ document.getElementById("find-btn").addEventListener("click", async (event) => {
   const originalIconHTML = btnIcon.innerHTML; // Store the original icon
 
   if (!address) {
-    console.error("No address entered.");
+    geoLogger.error("No address entered");
     showError("Please enter an address.");
     return;
   }
@@ -277,7 +298,8 @@ document.getElementById("find-btn").addEventListener("click", async (event) => {
   findBtn.style.opacity = "0.5";
   findBtn.style.pointerEvents = "none";
 
-  let lat, lng;
+  let lat;
+  let lng;
 
   // Use geocoding on locations
   if (!lat || !lng) {
@@ -286,8 +308,10 @@ document.getElementById("find-btn").addEventListener("click", async (event) => {
       lat = result.geometry.location.lat();
       lng = result.geometry.location.lng();
     } catch (error) {
-      console.error("Geocoding error:", error);
-      showError("The address entered is not valid. Please select a valid address from the suggestions.");
+      geoLogger.error("Geocoding error:", error);
+      showError(
+        "The address entered is not valid. Please select a valid address from the suggestions.",
+      );
       btnIcon.innerHTML = originalIconHTML; // Restore original button content
       findBtn.style.opacity = "1";
       findBtn.style.pointerEvents = "auto";
@@ -295,23 +319,25 @@ document.getElementById("find-btn").addEventListener("click", async (event) => {
     }
   }
   const locationPageURL = `/locations?lat=${lat}&lng=${lng}`;
-  console.log("Redirecting to:", locationPageURL);
+  geoLogger.log("Redirecting to:", locationPageURL);
   window.location.href = locationPageURL;
 });
 
 // "Use Current Location" button event handler
-document.getElementById("get_location_btn").addEventListener("click", async (event) => {
+const getLocationButton = document.getElementById("get_location_btn");
+getLocationButton?.addEventListener("click", async (event) => {
   event.preventDefault();
-  console.log("Getting user location...");
+  geoLogger.log("Getting user location");
   await getUserLocation();
 });
 
 // Remove the input-no-round class when the input is empty
-document.getElementById("geo-address").addEventListener("input", function () {
+const geoAddressInput = document.getElementById("geo-address");
+geoAddressInput?.addEventListener("input", function () {
   const inputWrapper = document.querySelector(".g_location_form_input_wrap");
   if (this.value.trim() === "") {
-    inputWrapper.classList.remove("input-no-round"); // Remove class when empty
-    document.getElementById("autocomplete-results").remove(); // Remove autocomplete results
+    inputWrapper?.classList.remove("input-no-round"); // Remove class when empty
+    document.getElementById("autocomplete-results")?.remove(); // Remove autocomplete results
   }
 });
 

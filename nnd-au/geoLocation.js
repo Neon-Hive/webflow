@@ -1,3 +1,5 @@
+// TODO: We need to refactor these to the new NND US methods
+
 // Ensure Google Maps API is fully loaded (for geocoding fallback)
 async function loadGoogleMapsAPI() {
 	if (!window.google || !google.maps || !google.maps.Geocoder) {
