@@ -111,14 +111,22 @@ function addItemsToLocationData() {
     "https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg";
 
   document.querySelectorAll(".location_block_result_item_wrap").forEach((item) => {
-    const name = item.getAttribute("data-name");
+    const rawName = item.getAttribute("data-name");
+    const name = rawName?.trim();
     const lat = Number.parseFloat(item.getAttribute("data-lat"));
     const lng = Number.parseFloat(item.getAttribute("data-lng"));
 
-    // Skip empty/placeholder rows (missing name or invalid coordinates). Without
-    // this, a blank CMS/nest template item plots a (0,0) "null island" marker.
-    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      mapLogger.warn("Skipping location with missing data:", { name, lat, lng });
+    // Skip empty/placeholder rows. Treat a missing name, blank string, or the
+    // literal "null"/"undefined" text as invalid (a real CMS record with an
+    // unbound Name field renders `data-name="null"`), and require real coords.
+    const invalidName =
+      !name || name.toLowerCase() === "null" || name.toLowerCase() === "undefined";
+    if (invalidName || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      mapLogger.warn("Skipping location with missing data:", {
+        name: rawName,
+        lat,
+        lng,
+      });
       return;
     }
 
