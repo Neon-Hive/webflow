@@ -18,66 +18,80 @@ const mapLogger = {
   },
 };
 
-// Handle locationData from cms load. Needed to get more than 100+ items
 window.fsAttributes = window.fsAttributes || [];
-window.locationData = window.locationData || []; // Store location data globally
+window.locationData = window.locationData || [];
 
-// Wait for FinSweet CMS Load to finish loading nest & filter
+const LOCATION_DATA_KEY = "nnd_location_data";
+const LOCATION_DATA_TIMESTAMP_KEY = "nnd_location_data_timestamp";
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+function isCacheValid() {
+  const timestamp = sessionStorage.getItem(LOCATION_DATA_TIMESTAMP_KEY);
+  if (!timestamp) return false;
+  return Date.now() - Number.parseInt(timestamp, 10) < CACHE_EXPIRY_MS;
+}
+
+const cachedData = sessionStorage.getItem(LOCATION_DATA_KEY);
+
+if (cachedData && isCacheValid()) {
+  try {
+    window.locationData = JSON.parse(cachedData);
+    mapLogger.log(
+      "Loaded locationData from sessionStorage:",
+      window.locationData.length,
+      "items",
+    );
+    window.dispatchEvent(new Event("locationDataLoaded"));
+  } catch (e) {
+    mapLogger.warn("Failed to parse sessionStorage data, will reload from CMS.", e);
+    sessionStorage.removeItem(LOCATION_DATA_KEY);
+    sessionStorage.removeItem(LOCATION_DATA_TIMESTAMP_KEY);
+  }
+} else if (cachedData) {
+  sessionStorage.removeItem(LOCATION_DATA_KEY);
+  sessionStorage.removeItem(LOCATION_DATA_TIMESTAMP_KEY);
+}
+
 window.fsAttributes.push([
   "cmsload",
   (cmsLoadInstances) => {
-    // First initialize cmsnest
     window.fsAttributes.cmsnest.init().then(() => {
-      mapLogger.log("CMS Nest successfully initialized!");
-
-      // Hide all skeleton wrappers once loading is complete
       document
         .querySelectorAll(".locations_loading-wrapper")
         .forEach((wrapper) => {
           wrapper.style.display = "none";
         });
 
-      // Hide all skeleton wrappers once loading is complete - handle location list in map code
       document
         .querySelectorAll(".n4_loading-skeleton:not(.is-location-item)")
         .forEach((wrapper) => {
           wrapper.style.display = "none";
         });
 
-      // Show all CMS locations once loading is complete
       document.querySelectorAll(".locations_nest").forEach((location) => {
         location.style.display = "";
       });
 
-      syncStateAttributes(); // Sync state attributes for dropdown filters
+      syncStateAttributes();
 
       const [filterInstance] = cmsLoadInstances;
 
-      // Then initialize cmsfilter when cmsnest is done
       window.fsAttributes.cmsfilter.init().then(() => {
-        mapLogger.log("CMS Filter successfully initialized!");
-
-        // Hook into the 'renderitems' event - this fires after FinSweet filtering updates the DOM
         filterInstance.listInstance.on("renderitems", () => {
-          mapLogger.log(
-            "FinSweet Filtering Applied. Checking empty countries...",
-          );
           checkForEmptyCountries();
         });
       });
-
-      mapLogger.log("CMS Nest loading complete.");
     });
 
-    // Listen for loaded event on each cms load instance
-    cmsLoadInstances.forEach((instance) => {
-      instance.on("loaded", () => {
-        addItemsToLocationData();
+    if (!cachedData || !isCacheValid()) {
+      cmsLoadInstances.forEach((instance) => {
+        instance.on("loaded", () => {
+          addItemsToLocationData();
+        });
       });
-    });
 
-    // Run once on initial load
-    addItemsToLocationData();
+      addItemsToLocationData();
+    }
   },
 ]);
 
@@ -87,51 +101,47 @@ function addItemsToLocationData() {
   const invalidPlaceholder =
     "https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg";
 
-  document
-    .querySelectorAll(".location_block_result_item_wrap")
-    .forEach((item) => {
-      // Build a unique key using name + lat + lng (or other unique fields)
-      const name = item.getAttribute("data-name");
-      const lat = Number.parseFloat(item.getAttribute("data-lat")) || 0;
-      const lng = Number.parseFloat(item.getAttribute("data-lng")) || 0;
-      const uniqueKey = `${name}_${lat}_${lng}`;
+  document.querySelectorAll(".location_block_result_item_wrap").forEach((item) => {
+    const name = item.getAttribute("data-name");
+    const lat = Number.parseFloat(item.getAttribute("data-lat")) || 0;
+    const lng = Number.parseFloat(item.getAttribute("data-lng")) || 0;
+    const uniqueKey = `${name}_${lat}_${lng}`;
 
-      // Only add if not already present (by uniqueKey)
-      if (!locationData.some((entry) => entry.uniqueKey === uniqueKey)) {
-        let imageUrl = item.querySelector("img")?.getAttribute("src") || "";
+    if (!window.locationData.some((entry) => entry.uniqueKey === uniqueKey)) {
+      let imageUrl = item.querySelector("img")?.getAttribute("src") || "";
 
-        // Ensure the fallback image is applied if imageUrl is empty or is the webflow placeholder
-        if (
-          !imageUrl ||
-          imageUrl.trim() === "" ||
-          imageUrl === invalidPlaceholder
-        ) {
-          imageUrl = fallbackUrl;
-        }
-
-        locationData.push({
-          uniqueKey: uniqueKey, // Add unique key for identification
-          name: name,
-          lat: lat,
-          lng: lng,
-          imageUrl: imageUrl,
-          link: item.getAttribute("data-link")
-            ? `/location/${item.getAttribute("data-link")}`
-            : "",
-          country: item.getAttribute("data-country") || "",
-          state: item.getAttribute("data-state") || "",
-          city: item.getAttribute("data-city") || "",
-          postcodes: item.getAttribute("data-postcode") || "",
-          stateISO: item.getAttribute("data-state-iso") || "",
-        });
+      if (!imageUrl || imageUrl.trim() === "" || imageUrl === invalidPlaceholder) {
+        imageUrl = fallbackUrl;
       }
-    });
 
-  // Dispatch a custom event to signal that locationData is ready
+      window.locationData.push({
+        uniqueKey,
+        name,
+        lat,
+        lng,
+        imageUrl,
+        link: item.getAttribute("data-link")
+          ? `/location/${item.getAttribute("data-link")}`
+          : "",
+        country: item.getAttribute("data-country") || "",
+        state: item.getAttribute("data-state") || "",
+        city: item.getAttribute("data-city") || "",
+        postcodes: item.getAttribute("data-postcode") || "",
+        stateISO: item.getAttribute("data-state-iso") || "",
+      });
+    }
+  });
+
+  try {
+    sessionStorage.setItem(LOCATION_DATA_KEY, JSON.stringify(window.locationData));
+    sessionStorage.setItem(LOCATION_DATA_TIMESTAMP_KEY, Date.now().toString());
+  } catch (e) {
+    mapLogger.warn("sessionStorage save failed:", e);
+  }
+
   window.dispatchEvent(new Event("locationDataLoaded"));
 }
 
-// Function to reapply attributes to new dropdown options
 function syncStateAttributes() {
   const dropdownLinks = document.querySelectorAll(
     "#w-dropdown-list-5 .filters_dropdown_list_item",
@@ -142,17 +152,17 @@ function syncStateAttributes() {
   const fsSelectOptions = document.querySelectorAll("#area option");
 
   originalStates.forEach((originalState) => {
-    const stateName = originalState.querySelector("div").textContent.trim();
+    const stateName = originalState.querySelector("div")?.textContent.trim();
     const country = originalState.getAttribute("n4-filter-state-country");
 
-    // Find matching option in the new dropdown
+    if (!stateName) return;
+
     fsSelectOptions.forEach((option) => {
       if (option.textContent.trim() === stateName) {
         option.setAttribute("n4-filter-state-country", country);
       }
     });
 
-    // Find matching .filters_dropdown_list_item elements
     dropdownLinks.forEach((link) => {
       if (link.textContent.trim() === stateName) {
         link.setAttribute("n4-filter-state-country", country);
@@ -162,20 +172,40 @@ function syncStateAttributes() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  window.userLocation = null; // Ensure global variable exists
+  window.userLocation = null;
 
-  // Handle nesting load states for FinSweet
-  const loadingWrappers = document.querySelectorAll(
-    ".locations_loading-wrapper",
-  );
-  const cmsLocations = document.querySelectorAll(".locations_nest");
+  const heroListElem = document.querySelector(".location_hero_list");
+  const resultCountElem = document.getElementById("map_result_count");
 
-  cmsLocations.forEach((location) => {
+  // Holds the active MarkerClusterer so filtering can drive it (instead of
+  // toggling marker.map directly, which the clusterer would undo on redraw).
+  let markerCluster;
+
+  function debounce(fn, delay) {
+    let timer;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
+  function markerLat(marker) {
+    return typeof marker.position?.lat === "function"
+      ? marker.position.lat()
+      : marker.position?.lat;
+  }
+
+  function markerLng(marker) {
+    return typeof marker.position?.lng === "function"
+      ? marker.position.lng()
+      : marker.position?.lng;
+  }
+
+  document.querySelectorAll(".locations_nest").forEach((location) => {
     location.style.display = "none";
   });
 
-  // Loop through each loading wrapper and append 10 skeletons
-  loadingWrappers.forEach((wrapper) => {
+  document.querySelectorAll(".locations_loading-wrapper").forEach((wrapper) => {
     for (let i = 0; i < 10; i++) {
       const skeleton = document.createElement("div");
       skeleton.classList.add("n4-locations_loading-skeleton");
@@ -183,48 +213,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Function to initialize the map once location data is available
+  async function loadGoogleMapsAPI() {
+    if (window.google?.maps?.importLibrary) return;
+
+    return new Promise((resolve, reject) => {
+      const existingScript = document.querySelector(
+        "script[src*='maps.googleapis.com/maps/api/js']",
+      );
+      if (existingScript) {
+        existingScript.addEventListener("load", resolve, { once: true });
+        existingScript.addEventListener("error", reject, { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src =
+        "https://maps.googleapis.com/maps/api/js?key=AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo&v=weekly&libraries=places,marker";
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Google Maps API failed to load"));
+      document.head.appendChild(script);
+    });
+  }
+
   async function initMapWhenReady() {
     if (window.locationData.length > 0) {
-      mapLogger.log("Location data available, initializing map...");
       await initMap();
       await checkForLocationInURL();
     } else {
-      mapLogger.log("Waiting for location data before initializing map...");
       window.addEventListener(
         "locationDataLoaded",
         async () => {
-          mapLogger.log("locationData is now loaded, initializing map...");
           await initMap();
           await checkForLocationInURL();
         },
-        { once: true }, // Ensure this runs only once
+        { once: true },
       );
     }
   }
 
-  // Ensure Google Maps API is fully loaded (for geocoding fallback)
-  async function loadGoogleMapsAPI() {
-    if (!window.google?.maps?.Geocoder) {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src =
-          "https://maps.googleapis.com/maps/api/js?key=AIzaSyB0jAOIGrgm3Lds1w4emxDtTADvgtYUFYo&libraries=places";
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-          mapLogger.log("Google Maps API Loaded");
-          resolve();
-        };
-        script.onerror = () =>
-          reject(new Error("Google Maps API failed to load"));
-
-        document.head.appendChild(script);
-      });
-    }
-  }
-
-  // Function to get the user's current location and update the address input
   async function getUserLocation(forceRequest = false) {
     if (!navigator.geolocation) {
       showError("Geolocation is not supported by your browser.");
@@ -232,7 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      // Check permission state before making request
       const permission = await navigator.permissions.query({
         name: "geolocation",
       });
@@ -245,50 +272,34 @@ document.addEventListener("DOMContentLoaded", () => {
         return null;
       }
 
-      // If permission is "prompt", only request if the user explicitly clicks the button
-      if (permission.state === "prompt" && !forceRequest) {
-        mapLogger.log(
-          "Waiting for user to interact before requesting location.",
-        );
-        return null;
-      }
+      if (permission.state === "prompt" && !forceRequest) return null;
 
-      return new Promise((resolve, _reject) => {
+      return new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            mapLogger.log("User's Location:", lat, lng);
+            mapLogger.log("User location:", lat, lng);
 
-            hideError(); // Hide any existing error messages
+            hideError();
 
             try {
               const address = await getAddressFromCoordinates(lat, lng);
-              if (address) {
-                const input = document.getElementById("geo-address");
-                if (input) {
-                  input.value = address;
-                  input.dataset.lat = lat;
-                  input.dataset.lng = lng;
-                }
-              } else {
-                showError("Unable to retrieve address from your location.");
+              const input = document.getElementById("geo-address");
+
+              if (input && address) {
+                input.value = address;
+                input.dataset.lat = lat;
+                input.dataset.lng = lng;
               }
 
-              // Automatically center & re-fit map when location is found
               if (window.map) {
-                mapLogger.log("Fitting map to user location");
-                const userLatLng = new google.maps.LatLng(lat, lng);
-                window.map.setCenter(userLatLng);
+                window.map.setCenter({ lat, lng });
                 window.map.setZoom(10);
               }
 
-              // Set global user location
               window.userLocation = { lat, lng };
-
-              // Immediately update marker list to show closest locations if needed
               window.updateMarkersList();
-
               resolve({ lat, lng });
             } catch (error) {
               mapLogger.error("Error fetching address:", error);
@@ -311,35 +322,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Function to get an address from latitude & longitude (Google Maps Geocoder)
   async function getAddressFromCoordinates(lat, lng) {
-    try {
-      await loadGoogleMapsAPI();
-      if (!google.maps.Geocoder) {
-        mapLogger.error("Google Maps Geocoder is not available.");
-        return null;
-      }
+    await loadGoogleMapsAPI();
 
-      return new Promise((resolve, reject) => {
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-          if (status === "OK" && results.length > 0) {
-            const address = results[0].formatted_address;
-            mapLogger.log("Address from Coordinates:", address);
-            resolve(address);
-          } else {
-            mapLogger.error("No address found or geocoding failed:", status);
-            reject("Unable to retrieve address.");
-          }
-        });
+    return new Promise((resolve, reject) => {
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === "OK" && results.length > 0) {
+          resolve(results[0].formatted_address);
+        } else {
+          reject(new Error(`Unable to retrieve address (status: ${status})`));
+        }
       });
-    } catch (error) {
-      mapLogger.error("Error in getAddressFromCoordinates:", error);
-      return null;
-    }
+    });
   }
 
-  // Show an error message above button container
   function showError(message) {
     const errorDiv = document.getElementById("address-error");
     if (errorDiv) {
@@ -348,7 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Hide the error message, if present
   function hideError() {
     const errorDiv = document.getElementById("address-error");
     if (errorDiv) {
@@ -357,9 +353,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Function to calculate distance (Haversine Formula)
   function calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371; // Radius of the Earth in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLng = (lng2 - lng1) * (Math.PI / 180);
     const a =
@@ -369,128 +364,93 @@ document.addEventListener("DOMContentLoaded", () => {
         Math.sin(dLng / 2) *
         Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return (R * c).toFixed(1); // Distance in km, rounded to 1 decimal place
+    return (R * c).toFixed(1);
   }
 
-  // Holds the active MarkerClusterer so filtering can drive it (instead of
-  // toggling marker.setMap directly, which the clusterer would undo on redraw).
-  let markerCluster;
+  function buildLocationCard(marker, showDistance = false) {
+    const { name, link, imageUrl, distance, country, state, city, postcodes, stateISO } =
+      marker.extraData;
+
+    const heroItem = document.createElement("a");
+    heroItem.classList.add("location_hero_item");
+    heroItem.href = link;
+
+    heroItem.setAttribute("n4-filter-name", name ? name.toLowerCase() : "");
+    heroItem.setAttribute("n4-filter-city", city ? city.toLowerCase() : "");
+    heroItem.setAttribute("n4-filter-state", state ? state.toLowerCase() : "");
+    heroItem.setAttribute("n4-filter-country", country ? country.toLowerCase() : "");
+    heroItem.setAttribute(
+      "n4-filter-postcodes",
+      postcodes ? postcodes.toLowerCase() : "",
+    );
+    heroItem.setAttribute("n4-filter-stateISO", stateISO ? stateISO.toLowerCase() : "");
+
+    heroItem.innerHTML = `
+      <div class="location_hero_item_image_wrap">
+        <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
+      </div>
+      <div class="location_hero_item_content">
+        <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
+        ${showDistance && distance ? `<p class="u-text-style-small">${distance} km away from you</p>` : ""}
+        <div class="learnmore_wrap is-underline w-inline-block">
+          <div class="learnmore_text u-text-style-main">See Location</div>
+          <div class="learnmore_underline"></div>
+        </div>
+      </div>
+    `;
+
+    return heroItem;
+  }
 
   function updateMarkersList() {
-    if (!window.map || !window.markers) return;
-    var resultCountElem = document.getElementById("map_result_count"); // Marker count div
-    var heroListElem = document.querySelector(".location_hero_list"); // Hero list div
+    if (!window.map || !window.markers || !heroListElem || !resultCountElem) return;
 
-    const bounds = map.getBounds();
+    const bounds = window.map.getBounds();
     if (!bounds) return;
 
-    const visibleMarkers = markers.filter((marker) =>
-      bounds.contains(marker.getPosition()),
+    const visibleMarkers = window.markers.filter((marker) =>
+      bounds.contains(marker.position),
     );
-
-    // Clear the hero list before updating
     heroListElem.innerHTML = "";
 
     if (visibleMarkers.length > 0) {
-      // If geolocation is enabled, sort markers by distance before displaying
       if (window.userLocation) {
         visibleMarkers.forEach((marker) => {
           marker.extraData.distance = calculateDistance(
             window.userLocation.lat,
             window.userLocation.lng,
-            marker.getPosition().lat(),
-            marker.getPosition().lng(),
+            markerLat(marker),
+            markerLng(marker),
           );
         });
 
-        // Sort by closest first
         visibleMarkers.sort(
           (a, b) => a.extraData.distance - b.extraData.distance,
         );
       } else {
-        // If no geolocation, sort alphabetically by name
         visibleMarkers.sort((a, b) =>
           a.extraData.name.localeCompare(b.extraData.name),
         );
       }
 
       visibleMarkers.forEach((marker) => {
-        if (!marker.extraData) {
-          mapLogger.warn("Missing extraData for marker:", marker);
-          return; // Skip this marker
-        }
-
-        const {
-          name,
-          link,
-          imageUrl,
-          country,
-          state,
-          city,
-          postcodes,
-          stateISO,
-        } = marker.extraData;
-        const heroItem = document.createElement("a");
-        heroItem.classList.add("location_hero_item");
-        heroItem.href = link;
-
-        // Store location data in `n4-filter-` attributes for filtering
-        heroItem.setAttribute("n4-filter-name", name ? name.toLowerCase() : "");
-        heroItem.setAttribute("n4-filter-city", city ? city.toLowerCase() : "");
-        heroItem.setAttribute(
-          "n4-filter-state",
-          state ? state.toLowerCase() : "",
-        );
-        heroItem.setAttribute(
-          "n4-filter-country",
-          country ? country.toLowerCase() : "",
-        );
-        heroItem.setAttribute(
-          "n4-filter-postcodes",
-          postcodes ? postcodes.toLowerCase() : "",
-        );
-        heroItem.setAttribute(
-          "n4-filter-stateISO",
-          stateISO ? stateISO.toLowerCase() : "",
-        );
-
-        heroItem.innerHTML = `
-          <div class="location_hero_item_image_wrap">
-            <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
-          </div>
-          <div class="location_hero_item_content">
-            <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-            <div class="learnmore_wrap is-underline w-inline-block">
-              <div class="learnmore_text u-text-style-main">See Location</div>
-              <div class="learnmore_underline"></div>
-              <div class="learnmore_icon w-embed">
-                <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
-                  <rect y="0.5" width="18" height="18" rx="9" fill="#EC008C"></rect>
-                  <path d="M10.5644 9.11433L8.55285 7.04545L9.08317 6.5L12 9.50002L9.08317 12.5L8.55285 11.9545L10.5644 9.88572H6V9.11433H10.5644Z" fill="white"></path>
-                </svg>
-              </div>
-            </a>
-          </div>
-        `;
-        heroListElem.appendChild(heroItem);
+        heroListElem.appendChild(buildLocationCard(marker));
       });
 
       resultCountElem.textContent = `Showing ${visibleMarkers.length} Locations`;
-    } else if (window.userLocation) {
-      // if we have user location display closest 3 locations
-      mapLogger.warn("No visible markers. Displaying the closest 3 locations.");
+      return;
+    }
 
-      // Recalculate distances after location change
+    if (window.userLocation) {
       window.markers.forEach((marker) => {
         marker.extraData.distance = calculateDistance(
           window.userLocation.lat,
           window.userLocation.lng,
-          marker.getPosition().lat(),
-          marker.getPosition().lng(),
+          markerLat(marker),
+          markerLng(marker),
         );
       });
 
-      // Sort all markers by distance from the user
       const closestThree = window.markers
         .filter(
           (marker) =>
@@ -500,146 +460,48 @@ document.addEventListener("DOMContentLoaded", () => {
         .sort((a, b) => a.extraData.distance - b.extraData.distance)
         .slice(0, 3);
 
-      if (closestThree.length > 0) {
-        closestThree.forEach((marker, _index) => {
-          const { name, link, imageUrl, distance, stateISO } = marker.extraData;
+      closestThree.forEach((marker) => {
+        heroListElem.appendChild(buildLocationCard(marker, true));
+      });
 
-          const heroItem = document.createElement("a");
-          heroItem.classList.add("location_hero_item");
-          heroItem.href = link;
-
-          heroItem.innerHTML = `
-            <div class="location_hero_item_image_wrap">
-              <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
-            </div>
-            <div class="location_hero_item_content">
-              <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-              <p class="u-text-style-small">${distance} km away from you</p>
-              <div class="learnmore_wrap is-underline w-inline-block">
-                <div class="learnmore_text u-text-style-main">See Location</div>
-                <div class="learnmore_underline"></div>
-                <div class="learnmore_icon w-embed">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
-                    <rect y="0.5" width="18" height="18" rx="9" fill="#EC008C"></rect>
-                    <path d="M10.5644 9.11433L8.55285 7.04545L9.08317 6.5L12 9.50002L9.08317 12.5L8.55285 11.9545L10.5644 9.88572H6V9.11433H10.5644Z" fill="white"></path>
-                  </svg>
-                </div>
-              </a>
-            </div>
-          `;
-          heroListElem.appendChild(heroItem);
-        });
-
-        resultCountElem.textContent =
-          "Showing Closest Locations to your current location.";
-      } else {
-        resultCountElem.textContent = "No locations found in this area.";
-      }
+      resultCountElem.textContent = closestThree.length
+        ? "Showing Closest Locations to your current location."
+        : "No locations found in this area.";
     } else {
-      mapLogger.warn("No locations available in this area.");
       resultCountElem.textContent = "No locations found in this area.";
     }
   }
-  // Attach it to `window` so it is globally available
+
   window.updateMarkersList = updateMarkersList;
-  window.updateLocationList = updateLocationList;
 
   function updateLocationList(filteredMarkers) {
-    var heroListElem = document.querySelector(".location_hero_list");
-    heroListElem.innerHTML = ""; // Clear current list
+    if (!heroListElem || !resultCountElem) return;
+
+    heroListElem.innerHTML = "";
 
     filteredMarkers.forEach((marker) => {
-      const { name, link, imageUrl, stateISO } = marker.extraData;
-
-      const heroItem = document.createElement("a");
-      heroItem.classList.add("location_hero_item");
-      heroItem.href = link;
-
-      heroItem.innerHTML = `
-      <div class="location_hero_item_image_wrap">
-        <img src="${imageUrl}" loading="lazy" alt="${name}" class="location_hero_item_image">
-      </div>
-      <div class="location_hero_item_content">
-        <h4 class="location_hero_item_heading u-text-style-large">${name}, ${stateISO}</h4>
-        <div class="learnmore_wrap is-underline w-inline-block">
-          <div class="learnmore_text u-text-style-main">See Location</div>
-          <div class="learnmore_underline"></div>
-          <div class="learnmore_icon w-embed">
-            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
-              <rect y="0.5" width="18" height="18" rx="9" fill="#EC008C"></rect>
-              <path d="M10.5644 9.11433L8.55285 7.04545L9.08317 6.5L12 9.50002L9.08317 12.5L8.55285 11.9545L10.5644 9.88572H6V9.11433H10.5644Z" fill="white"></path>
-            </svg>
-          </div>
-        </a>
-      </div>
-    `;
-      heroListElem.appendChild(heroItem);
+      heroListElem.appendChild(buildLocationCard(marker));
     });
 
-    // Update result count
-    document.getElementById("map_result_count").textContent =
-      `Showing ${filteredMarkers.length} Locations`;
+    resultCountElem.textContent = `Showing ${filteredMarkers.length} Locations`;
   }
 
+  window.updateLocationList = updateLocationList;
+
   async function initMap(mapElemId = "map_canvas") {
-    // Request needed libraries.
-    await google.maps.importLibrary("maps");
-    var mapElem = document.getElementById(mapElemId);
+    await loadGoogleMapsAPI();
 
-    // Define custom styles
-    const customMapStyles = [
-      {
-        featureType: "administrative",
-        elementType: "all",
-        stylers: [{ saturation: "-100" }],
-      },
-      {
-        featureType: "administrative.province",
-        elementType: "all",
-        stylers: [{ visibility: "off" }],
-      },
-      {
-        featureType: "landscape",
-        elementType: "all",
-        stylers: [
-          { saturation: -100 },
-          { lightness: 65 },
-          { visibility: "on" },
-        ],
-      },
-      {
-        featureType: "poi",
-        elementType: "all",
-        stylers: [
-          { saturation: -100 },
-          { lightness: "50" },
-          { visibility: "simplified" },
-        ],
-      },
-      {
-        featureType: "road",
-        elementType: "all",
-        stylers: [{ saturation: "-100" }],
-      },
-      {
-        featureType: "water",
-        elementType: "geometry",
-        stylers: [{ hue: "#ffff00" }, { lightness: -25 }, { saturation: -97 }],
-      },
-      {
-        featureType: "water",
-        elementType: "labels",
-        stylers: [{ lightness: -25 }, { saturation: -100 }],
-      },
-    ];
+    const { Map: GoogleMap } = await google.maps.importLibrary("maps");
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-    const userLocation = await getUserLocation(); // Get user location if available
+    const mapElem = document.getElementById(mapElemId);
+    if (!mapElem) return null;
 
-    var mapOptions = {
+    const map = new GoogleMap(mapElem, {
+      mapId: "7ba0795cc547b1373ea4ae23",
       mapTypeId: "roadmap",
       zoom: 12,
       gestureHandling: window.innerWidth <= 425 ? "greedy" : "auto",
-      styles: customMapStyles, // Apply custom styles
       disableDefaultUI: true,
       zoomControl: true,
       streetViewControl: false,
@@ -647,47 +509,34 @@ document.addEventListener("DOMContentLoaded", () => {
       fullscreenControl: true,
       rotateControl: false,
       scaleControl: false,
-    };
+    });
 
-    mapLogger.log("Initializing the map:", mapElemId);
-    var map = new google.maps.Map(mapElem, mapOptions);
-    window.map = map; // Make map available globally
-
-    // Custom marker icon
-    const customMarkerIcon = {
-      url: "https://cdn.prod.website-files.com/67ab6f4970b90367b528f15a/67c8f176df8419775322fa3d_NND-marker.svg",
-      scaledSize: new google.maps.Size(50, 65),
-      anchor: new google.maps.Point(25, 60),
-    };
+    window.map = map;
 
     const markers = [];
     const bounds = new google.maps.LatLngBounds();
     const infoWindow = new google.maps.InfoWindow();
 
-    // Add markers dynamically from locationData source & store in a new array with distance and fallback image
-    locationData.forEach((location) => {
-      let distance = null;
+    window.locationData.forEach((location) => {
+      const markerEl = document.createElement("img");
+      markerEl.src =
+        "https://cdn.prod.website-files.com/67ab6f4970b90367b528f15a/67c8f176df8419775322fa3d_NND-marker.svg";
+      markerEl.alt = location.name || "Location marker";
+      markerEl.style.width = "50px";
+      markerEl.style.height = "65px";
 
-      if (userLocation) {
-        distance = calculateDistance(
-          userLocation.lat,
-          userLocation.lng,
-          location.lat,
-          location.lng,
-        );
-      }
-
-      const marker = new google.maps.Marker({
+      const marker = new AdvancedMarkerElement({
+        map,
         position: { lat: location.lat, lng: location.lng },
-        map: map,
-        icon: customMarkerIcon,
+        content: markerEl,
+        title: location.name,
       });
 
-      // Store extra data inside marker
       marker.extraData = {
         name: location.name,
         link: location.link,
         imageUrl: location.imageUrl,
+        distance: null,
         country: location.country,
         state: location.state,
         city: location.city,
@@ -695,140 +544,114 @@ document.addEventListener("DOMContentLoaded", () => {
         stateISO: location.stateISO,
       };
 
-      marker.addListener("click", () => {
+      marker.addListener("gmp-click", () => {
+        const distance = window.userLocation
+          ? calculateDistance(
+              window.userLocation.lat,
+              window.userLocation.lng,
+              location.lat,
+              location.lng,
+            )
+          : null;
+
         infoWindow.setContent(`
           <div style="max-width: 250px;">
             <div class="u-vflex-stretch-center u-gap-3">
               <div style="overflow: hidden; border-radius: .75rem;">
                 <img style="max-height: 8rem; aspect-ratio: 16 / 9; object-position: 0% 50%;" src="${location.imageUrl}" alt="${location.name}">
               </div>
-                <div>
-                  <h4 class="location_hero_item_heading u-text-style-large">${location.name}, ${location.stateISO}</h4>
-                  <p class="u-text-style-tiny">${location.city}, ${location.state}, ${location.country}</p>
-                </div>
+              <div>
+                <h4 class="location_hero_item_heading u-text-style-large">${location.name}, ${location.stateISO}</h4>
+                <p class="u-text-style-tiny">${location.city}, ${location.state}, ${location.country}</p>
+              </div>
               ${distance ? `<p style="margin: 5px 0; font-size: 14px;"><strong>${distance} km away</strong></p>` : ""}
               <a href="${location.link}" class="learnmore_wrap is-underline w-inline-block">
                 <div class="learnmore_text u-text-style-main">See Location</div>
                 <div class="learnmore_underline"></div>
-                <div class="learnmore_icon w-embed">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 18 19" fill="none" preserveAspectRatio="xMidYMid meet" aria-hidden="true" role="img">
-                    <rect y="0.5" width="18" height="18" rx="9" fill="#EC008C"></rect>
-                    <path d="M10.5644 9.11433L8.55285 7.04545L9.08317 6.5L12 9.50002L9.08317 12.5L8.55285 11.9545L10.5644 9.88572H6V9.11433H10.5644Z" fill="white"></path>
-                  </svg>
-                </div>
               </a>
             </div>
           </div>
         `);
-        infoWindow.open(map, marker);
+
+        infoWindow.open({
+          anchor: marker,
+          map,
+        });
       });
 
-      markers.push(marker); // Push marker to array
-      bounds.extend(marker.getPosition());
+      markers.push(marker);
+      bounds.extend(marker.position);
     });
 
-    // Make markers available globally
     window.markers = markers;
-    mapLogger.log("Markers added successfully.");
 
-    // Fallback if markers ARE available and nesting is slow, show map and locations immediately
     document.querySelectorAll(".n4_loading-skeleton").forEach((loader) => {
-      if (loader.style.display !== "none") {
-        loader.style.display = "none";
-      }
+      loader.style.display = "none";
     });
 
-    // Show result count once loading is complete
-    document.querySelector(".location_hero_count_wrap").style.display = "block";
+    const countWrap = document.querySelector(".location_hero_count_wrap");
+    if (countWrap) countWrap.style.display = "block";
 
-    // If user location exists, prioritize it
-    if (userLocation) {
-      mapLogger.log("Centering on user location:", userLocation);
-      map.setCenter(userLocation);
-      map.setZoom(10);
-    } else {
-      if (markers.length > 0) {
-        map.fitBounds(bounds);
-      }
+    if (markers.length > 0) {
+      map.fitBounds(bounds);
     }
 
-    // Remove old event listeners and attach the new function
-    map.addListener("bounds_changed", updateMarkersList);
+    map.addListener("bounds_changed", debounce(updateMarkersList, 300));
     setTimeout(updateMarkersList, 1000);
 
-    // Map clustering with counts and scale based on amount
-    const renderer = {
-      render: ({ count, position }) => {
-        // Define a base size and compute additional size based on count
-        const baseSize = 40;
-        // Increase by 10 for every 10 markers (capped at 80px)
-        const additionalSize = Math.floor(count / 10) * 10;
-        const size = Math.min(baseSize + additionalSize, 80);
+    if (window.markerClusterer && markers.length > 0) {
+      const renderer = {
+        render: ({ count, position }) => {
+          const size = Math.min(40 + Math.floor(count / 10) * 10, 80);
 
-        // Calculate circle parameters based on size
-        const radius = size / 2;
-        // Adjust text position; you may need to tweak these values for perfect centering
-        const textX = radius;
-        const textY = radius + size * 0.1;
-        const fontSize = Math.floor(size / 3);
+          const clusterEl = document.createElement("div");
+          clusterEl.style.width = `${size}px`;
+          clusterEl.style.height = `${size}px`;
+          clusterEl.style.borderRadius = "50%";
+          clusterEl.style.background = "#EC008C";
+          clusterEl.style.color = "#fff";
+          clusterEl.style.display = "flex";
+          clusterEl.style.alignItems = "center";
+          clusterEl.style.justifyContent = "center";
+          clusterEl.style.fontFamily = "Arial, sans-serif";
+          clusterEl.style.fontWeight = "700";
+          clusterEl.style.fontSize = `${Math.floor(size / 3)}px`;
+          clusterEl.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.25)";
+          clusterEl.textContent = count;
 
-        // Build the SVG string with dynamic sizing
-        const svg = `
-        <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="${radius}" cy="${radius}" r="${radius}" fill="#EC008C" />
-          <text x="${textX}" y="${textY}" text-anchor="middle" fill="#fff" font-size="${fontSize}" font-family="Arial" font-weight="bold">${count}</text>
-        </svg>
-        `;
-        const icon = {
-          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-          scaledSize: new google.maps.Size(size, size),
-        };
+          return new google.maps.marker.AdvancedMarkerElement({
+            map,
+            position,
+            content: clusterEl,
+            title: `${count} locations`,
+          });
+        },
+      };
 
-        return new google.maps.Marker({
-          map: map,
-          position: position,
-          icon: icon,
-        });
-      },
-    };
+      markerCluster = new markerClusterer.MarkerClusterer({
+        map,
+        markers,
+        renderer,
+        zoomOnClick: false,
+        onClusterClick: (_event, cluster) => {
+          map.fitBounds(cluster.bounds);
 
-    markerCluster = new markerClusterer.MarkerClusterer({
-      map: map,
-      markers: markers,
-      renderer,
-      zoomOnClick: false, // We will handle zoom manually
-      onClusterClick: (cluster) => {
-        const bounds = cluster.bounds;
-        map.fitBounds(bounds);
+          setTimeout(() => {
+            const currentZoom = map.getZoom();
+            if (currentZoom > 14) map.setZoom(14);
+          }, 300);
+        },
+      });
+    }
 
-        // Delay to ensure map bounds are set before checking zoom level
-        setTimeout(() => {
-          const currentZoom = map.getZoom();
-          // Prevent excessive zoom-in that hides markers
-          if (currentZoom > 14) {
-            map.setZoom(14); // Adjust max zoom to ensure pins stay visible
-          }
-        }, 300);
-      },
-    });
-
-    // Return the map instance for further use
     return map;
   }
 
-  // Function to check URL for lat/lng and center map if available
   async function checkForLocationInURL() {
     const params = new URLSearchParams(window.location.search);
     const lat = Number.parseFloat(params.get("lat"));
     const lng = Number.parseFloat(params.get("lng"));
-    const query = params.get("q");
-
-    // Show the original search term (from the homepage) in the input so the
-    // user can see what they searched for.
-    if (query) {
-      const input = document.getElementById("geo-address");
-      if (input && !input.value) input.value = query;
-    }
+    const urlAddress = params.get("address"); // already decoded by URLSearchParams
 
     if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
       // Treat the searched point as the user's location so the results list
@@ -836,49 +659,52 @@ document.addEventListener("DOMContentLoaded", () => {
       // every location alphabetically.
       window.userLocation = { lat, lng };
 
-      // Wait for the map and markers to fully initialize
-      const waitForMap = async () => {
-        return new Promise((resolve) => {
+      const waitForMap = () =>
+        new Promise((resolve) => {
           const check = () => {
-            if (window.map && window.markers && window.markers.length > 0) {
+            if (window.map && window.markers && window.markers.length > 0)
               resolve();
-            } else {
-              setTimeout(check, 500);
-            }
+            else setTimeout(check, 500);
           };
           check();
         });
-      };
 
       await waitForMap();
+
       window.map.setCenter({ lat, lng });
       window.map.setZoom(10);
+
+      const input = document.getElementById("geo-address");
+      if (input) {
+        input.dataset.lat = String(lat);
+        input.dataset.lng = String(lng);
+        if (urlAddress) input.value = urlAddress;
+      }
+
       window.updateMarkersList?.(); // Refresh the list now that userLocation is set
     } else if (window.map && window.markers) {
       const bounds = new google.maps.LatLngBounds();
       window.markers.forEach((marker) => {
-        bounds.extend(marker.getPosition());
+        bounds.extend(marker.position);
       });
       window.map.fitBounds(bounds);
     }
   }
 
-  // Call geolocation when user clicks the "Use My Location" button
-  document
-    .getElementById("get_location_btn")
-    .addEventListener("click", async () => {
-      hideError(); // Hide any existing error messages
-      await getUserLocation(true); // Forces prompt
+  const getLocationBtn = document.getElementById("get_location_btn");
+  if (getLocationBtn) {
+    getLocationBtn.addEventListener("click", async () => {
+      hideError();
+      await getUserLocation(true);
     });
+  }
 
-  // Listen for postcode/city/suburb/city form inputs and filter the hero list
-  async function filterHeroList(rawSearchTerm) {
+  function filterHeroList(rawSearchTerm) {
     const searchTerm = rawSearchTerm.trim().toLowerCase();
 
     const bounds = new google.maps.LatLngBounds();
-    let matchesFound = false;
 
-    let matchedMarkers = window.markers.filter((marker) => {
+    const matchedMarkers = window.markers.filter((marker) => {
       const { name, city, state, country, postcodes, stateISO } =
         marker.extraData;
       const locationText =
@@ -886,101 +712,43 @@ document.addEventListener("DOMContentLoaded", () => {
       return locationText.includes(searchTerm);
     });
 
-    if (matchedMarkers.length > 0) {
-      // If we found an exact match, show those locations
-      matchedMarkers.forEach((marker) => {
-        bounds.extend(marker.getPosition());
-      });
-      matchesFound = true;
-    } else {
-      // No match found in our data → Try Google Geocoding
-      mapLogger.warn(`No exact match for "${searchTerm}". Querying Google...`);
-      const location = await getLatLngFromSearch(searchTerm);
-      if (location) {
-        // Find closest locations to the searched area
-        matchedMarkers = findClosestLocations(location.lat, location.lng);
-        matchedMarkers.forEach((marker) => {
-          bounds.extend(marker.getPosition());
-        });
-        matchesFound = true;
-      }
-    }
-
-    // Show only the matched markers by re-seeding the clusterer. Driving it here
-    // keeps cluster counts in sync; toggling marker.setMap would be reverted on
-    // the clusterer's next redraw and hidden pins would reappear.
+    // Show only the matched markers. Drive the clusterer when it's active so
+    // cluster counts stay in sync; otherwise toggle marker.map directly.
     if (markerCluster) {
       markerCluster.clearMarkers();
       markerCluster.addMarkers(matchedMarkers);
-    }
-
-    // Update the left-hand list
-    updateLocationList(matchedMarkers);
-
-    // Adjust the map view
-    if (matchesFound) {
-      window.map.fitBounds(bounds);
-      if (matchedMarkers.length === 1) {
-        window.map.setZoom(14); // If only one location, zoom in
-      }
-    }
-  }
-
-  // Function to find the closest locations to a given lat/lng
-  async function getLatLngFromSearch(searchQuery) {
-    try {
-      await loadGoogleMapsAPI(); // Ensure Google Maps API is loaded
-
-      return new Promise((resolve) => {
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ address: searchQuery }, (results, status) => {
-          if (status === "OK" && results.length > 0) {
-            const location = results[0].geometry.location;
-            mapLogger.log(`Found lat/lng for "${searchQuery}":`, location);
-            resolve({ lat: location.lat(), lng: location.lng() });
-          } else {
-            mapLogger.error(`No results for "${searchQuery}".`);
-            resolve(null);
-          }
-        });
+    } else {
+      window.markers.forEach((marker) => {
+        marker.map = matchedMarkers.includes(marker) ? window.map : null;
       });
-    } catch (error) {
-      mapLogger.error("Error in getLatLngFromSearch:", error);
-      return null;
     }
-  }
 
-  function findClosestLocations(searchLat, searchLng) {
-    window.markers.forEach((marker) => {
-      marker.extraData.distance = calculateDistance(
-        searchLat,
-        searchLng,
-        marker.getPosition().lat(),
-        marker.getPosition().lng(),
-      );
+    matchedMarkers.forEach((marker) => {
+      bounds.extend(marker.position);
     });
 
-    return window.markers
-      .filter(
-        (marker) =>
-          marker.extraData.distance !== null &&
-          !Number.isNaN(marker.extraData.distance),
-      )
-      .sort((a, b) => a.extraData.distance - b.extraData.distance)
-      .slice(0, 3); // Return the 3 closest locations
+    updateLocationList(matchedMarkers);
+
+    if (matchedMarkers.length > 0) {
+      window.map.fitBounds(bounds);
+      if (matchedMarkers.length === 1) window.map.setZoom(14);
+    }
   }
 
   const addressInput = document.getElementById("geo-address");
-  addressInput.addEventListener("input", function () {
-    filterHeroList(this.value);
-    hideError(); // Hide any existing error messages
-  });
+  if (addressInput) {
+    addressInput.addEventListener(
+      "input",
+      debounce(function () {
+        filterHeroList(this.value);
+        hideError();
+      }, 500),
+    );
+  }
 
-  // ####### Handle on page dropdown filters after CMS filter is loaded ########
   const countrySelect = document.getElementById("country");
   const stateSelect = document.getElementById("area");
 
-  // Wait for FinSweet filters then check for empty countries
   function filterStates() {
     setTimeout(checkForEmptyCountries, 200);
   }
@@ -991,7 +759,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "#w-dropdown-list-5 .filters_dropdown_list_item",
     );
 
-    // Show or hide countries based on selection
     document
       .querySelectorAll(".location_block_item_wrap")
       .forEach((countryItem) => {
@@ -1002,18 +769,12 @@ document.addEventListener("DOMContentLoaded", () => {
             : "none";
       });
 
-    // Show or hide states based on selection
     dropdownLinks.forEach((option, index) => {
       const optionCountry = option.getAttribute("n4-filter-state-country");
 
-      if (index === 0) {
-        // Ensure "All States" is always visible
-        option.style.display = "block";
-      } else if (!selectedCountry || selectedCountry === "") {
-        // If "All Countries" is selected, show all states
+      if (index === 0 || !selectedCountry) {
         option.style.display = "block";
       } else {
-        // Otherwise, filter states based on the selected country
         option.style.display =
           optionCountry === selectedCountry ? "block" : "none";
       }
@@ -1021,26 +782,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function checkForEmptyCountries() {
-    mapLogger.log("Checking for empty countries...");
     document
       .querySelectorAll(".location_block_item_wrap")
       .forEach((countryItem) => {
         const locationContainer = countryItem.querySelector(
           "[fs-cmsnest-collection='location']",
         );
-
-        if (!locationContainer || locationContainer.children.length === 0) {
-          countryItem.style.display = "none"; // Hide if no locations exist
-        } else {
-          countryItem.style.display = "block"; // Show if locations exist
-        }
+        countryItem.style.display =
+          !locationContainer || locationContainer.children.length === 0
+            ? "none"
+            : "block";
       });
   }
 
-  // Event listeners
   if (countrySelect) countrySelect.addEventListener("change", filterCountries);
   if (stateSelect) stateSelect.addEventListener("change", filterStates);
 
-  initMapWhenReady(); // Call function to wait for location data before initializing map
-  checkForLocationInURL(); // Check URL for location data on page load
+  initMapWhenReady();
 });

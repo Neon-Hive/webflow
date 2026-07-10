@@ -320,8 +320,8 @@ async function submitSearch() {
     return;
   }
 
-  // Pass the search term through as `q` so the locations page can show it
-  const locationPageURL = `/locations?lat=${lat}&lng=${lng}&q=${encodeURIComponent(
+  // Pass the search term through as `address` so the locations page can show it
+  const locationPageURL = `/locations?lat=${lat}&lng=${lng}&address=${encodeURIComponent(
     address,
   )}`;
   geoLogger.log("Redirecting to:", locationPageURL);
