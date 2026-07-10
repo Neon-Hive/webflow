@@ -76,11 +76,20 @@ window.fsAttributes.push([
 
       const [filterInstance] = cmsLoadInstances;
 
-      window.fsAttributes.cmsfilter.init().then(() => {
-        filterInstance.listInstance.on("renderitems", () => {
-          checkForEmptyCountries();
+      // CMS Filter isn't guaranteed to be loaded on the page (window.fsAttributes
+      // may have no `cmsfilter`). Guard it so a missing solution can't throw.
+      if (window.fsAttributes.cmsfilter?.init) {
+        window.fsAttributes.cmsfilter.init().then(() => {
+          filterInstance.listInstance.on("renderitems", () => {
+            checkForEmptyCountries();
+          });
         });
-      });
+      } else {
+        mapLogger.warn(
+          "FinSweet cmsfilter not loaded; skipping filter init.",
+        );
+        checkForEmptyCountries();
+      }
     });
 
     if (!cachedData || !isCacheValid()) {
@@ -103,8 +112,16 @@ function addItemsToLocationData() {
 
   document.querySelectorAll(".location_block_result_item_wrap").forEach((item) => {
     const name = item.getAttribute("data-name");
-    const lat = Number.parseFloat(item.getAttribute("data-lat")) || 0;
-    const lng = Number.parseFloat(item.getAttribute("data-lng")) || 0;
+    const lat = Number.parseFloat(item.getAttribute("data-lat"));
+    const lng = Number.parseFloat(item.getAttribute("data-lng"));
+
+    // Skip empty/placeholder rows (missing name or invalid coordinates). Without
+    // this, a blank CMS/nest template item plots a (0,0) "null island" marker.
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      mapLogger.warn("Skipping location with missing data:", { name, lat, lng });
+      return;
+    }
+
     const uniqueKey = `${name}_${lat}_${lng}`;
 
     if (!window.locationData.some((entry) => entry.uniqueKey === uniqueKey)) {
