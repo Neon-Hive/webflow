@@ -31,11 +31,28 @@ function isCacheValid() {
   return Date.now() - Number.parseInt(timestamp, 10) < CACHE_EXPIRY_MS;
 }
 
+// Single source of truth for whether a location entry is usable. Rejects blank /
+// "null" / "undefined" names and missing / (0,0) coordinates. Applied on EVERY
+// path — cache load, fresh CMS ingest, and marker build — so a bad row can never
+// reach the map or list regardless of where it came from.
+function isValidLocationEntry(entry) {
+  if (!entry) return false;
+  const name = typeof entry.name === "string" ? entry.name.trim().toLowerCase() : "";
+  if (!name || name === "null" || name === "undefined") return false;
+  const lat = Number(entry.lat);
+  const lng = Number(entry.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat === 0 && lng === 0) return false;
+  return true;
+}
+
 const cachedData = sessionStorage.getItem(LOCATION_DATA_KEY);
 
 if (cachedData && isCacheValid()) {
   try {
-    window.locationData = JSON.parse(cachedData);
+    // Filter here too — the cache may have been written before this guard
+    // existed, or hold a row whose CMS Name field is empty.
+    window.locationData = JSON.parse(cachedData).filter(isValidLocationEntry);
     mapLogger.log(
       "Loaded locationData from sessionStorage:",
       window.locationData.length,
@@ -541,6 +558,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const markers = [];
     const bounds = new google.maps.LatLngBounds();
     const infoWindow = new google.maps.InfoWindow();
+
+    // Final safety net: drop any invalid entry before it becomes a marker, so a
+    // bad row from any source can never appear on the map or in the list.
+    window.locationData = window.locationData.filter(isValidLocationEntry);
 
     window.locationData.forEach((location) => {
       const markerEl = document.createElement("img");
