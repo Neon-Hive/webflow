@@ -821,8 +821,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(window.location.search);
     const lat = Number.parseFloat(params.get("lat"));
     const lng = Number.parseFloat(params.get("lng"));
+    const query = params.get("q");
+
+    // Show the original search term (from the homepage) in the input so the
+    // user can see what they searched for.
+    if (query) {
+      const input = document.getElementById("geo-address");
+      if (input && !input.value) input.value = query;
+    }
 
     if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      // Treat the searched point as the user's location so the results list
+      // sorts by proximity (and falls back to the closest 3) instead of showing
+      // every location alphabetically.
+      window.userLocation = { lat, lng };
+
       // Wait for the map and markers to fully initialize
       const waitForMap = async () => {
         return new Promise((resolve) => {
@@ -840,6 +853,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await waitForMap();
       window.map.setCenter({ lat, lng });
       window.map.setZoom(10);
+      window.updateMarkersList?.(); // Refresh the list now that userLocation is set
     } else if (window.map && window.markers) {
       const bounds = new google.maps.LatLngBounds();
       window.markers.forEach((marker) => {

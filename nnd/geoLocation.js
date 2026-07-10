@@ -277,15 +277,15 @@ function hideError() {
   }
 }
 
-// "Find" button: when clicked, use Place Details to get lat/lng then redirect
-const findButton = document.getElementById("find-btn");
-findButton?.addEventListener("click", async (event) => {
-  event.preventDefault();
+// Geocode the entered address and redirect to the locations page. Shared by the
+// Find button click, the Enter key, and the form's native submit.
+async function submitSearch() {
   const input = document.getElementById("geo-address");
+  if (!input) return;
   const address = input.value.trim();
   const findBtn = document.getElementById("find-btn");
-  const btnIcon = findBtn.querySelector(".btn_main_icon");
-  const originalIconHTML = btnIcon.innerHTML; // Store the original icon
+  const btnIcon = findBtn?.querySelector(".btn_main_icon");
+  const originalIconHTML = btnIcon?.innerHTML ?? ""; // Store the original icon
 
   if (!address) {
     geoLogger.error("No address entered");
@@ -294,33 +294,52 @@ findButton?.addEventListener("click", async (event) => {
   }
 
   // Replace with a spinner
-  btnIcon.innerHTML = `<div class="spinner"></div>`;
-  findBtn.style.opacity = "0.5";
-  findBtn.style.pointerEvents = "none";
+  if (btnIcon) btnIcon.innerHTML = `<div class="spinner"></div>`;
+  if (findBtn) {
+    findBtn.style.opacity = "0.5";
+    findBtn.style.pointerEvents = "none";
+  }
 
   let lat;
   let lng;
 
-  // Use geocoding on locations
-  if (!lat || !lng) {
-    try {
-      const result = await geocodeAddress(address);
-      lat = result.geometry.location.lat();
-      lng = result.geometry.location.lng();
-    } catch (error) {
-      geoLogger.error("Geocoding error:", error);
-      showError(
-        "The address entered is not valid. Please select a valid address from the suggestions.",
-      );
-      btnIcon.innerHTML = originalIconHTML; // Restore original button content
+  try {
+    const result = await geocodeAddress(address);
+    lat = result.geometry.location.lat();
+    lng = result.geometry.location.lng();
+  } catch (error) {
+    geoLogger.error("Geocoding error:", error);
+    showError(
+      "The address entered is not valid. Please select a valid address from the suggestions.",
+    );
+    if (btnIcon) btnIcon.innerHTML = originalIconHTML; // Restore original button content
+    if (findBtn) {
       findBtn.style.opacity = "1";
       findBtn.style.pointerEvents = "auto";
-      return;
     }
+    return;
   }
-  const locationPageURL = `/locations?lat=${lat}&lng=${lng}`;
+
+  // Pass the search term through as `q` so the locations page can show it
+  const locationPageURL = `/locations?lat=${lat}&lng=${lng}&q=${encodeURIComponent(
+    address,
+  )}`;
   geoLogger.log("Redirecting to:", locationPageURL);
   window.location.href = locationPageURL;
+}
+
+// "Find" button: when clicked, geocode the address then redirect
+const findButton = document.getElementById("find-btn");
+findButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  submitSearch();
+});
+
+// Handle the native form submit (covers pressing Enter inside the input)
+const locationForm = document.querySelector(".g_location_form");
+locationForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  submitSearch();
 });
 
 // "Use Current Location" button event handler
@@ -338,6 +357,14 @@ geoAddressInput?.addEventListener("input", function () {
   if (this.value.trim() === "") {
     inputWrapper?.classList.remove("input-no-round"); // Remove class when empty
     document.getElementById("autocomplete-results")?.remove(); // Remove autocomplete results
+  }
+});
+
+// Enter key triggers the search (fallback when the input has no wrapping form)
+geoAddressInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    submitSearch();
   }
 });
 
