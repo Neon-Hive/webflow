@@ -37,7 +37,8 @@ function isCacheValid() {
 // reach the map or list regardless of where it came from.
 function isValidLocationEntry(entry) {
   if (!entry) return false;
-  const name = typeof entry.name === "string" ? entry.name.trim().toLowerCase() : "";
+  const name =
+    typeof entry.name === "string" ? entry.name.trim().toLowerCase() : "";
   if (!name || name === "null" || name === "undefined") return false;
   const lat = Number(entry.lat);
   const lng = Number(entry.lng);
@@ -60,7 +61,10 @@ if (cachedData && isCacheValid()) {
     );
     window.dispatchEvent(new Event("locationDataLoaded"));
   } catch (e) {
-    mapLogger.warn("Failed to parse sessionStorage data, will reload from CMS.", e);
+    mapLogger.warn(
+      "Failed to parse sessionStorage data, will reload from CMS.",
+      e,
+    );
     sessionStorage.removeItem(LOCATION_DATA_KEY);
     sessionStorage.removeItem(LOCATION_DATA_TIMESTAMP_KEY);
   }
@@ -102,9 +106,7 @@ window.fsAttributes.push([
           });
         });
       } else {
-        mapLogger.warn(
-          "FinSweet cmsfilter not loaded; skipping filter init.",
-        );
+        mapLogger.warn("FinSweet cmsfilter not loaded; skipping filter init.");
         checkForEmptyCountries();
       }
     });
@@ -127,55 +129,66 @@ function addItemsToLocationData() {
   const invalidPlaceholder =
     "https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg";
 
-  document.querySelectorAll(".location_block_result_item_wrap").forEach((item) => {
-    const rawName = item.getAttribute("data-name");
-    const name = rawName?.trim();
-    const lat = Number.parseFloat(item.getAttribute("data-lat"));
-    const lng = Number.parseFloat(item.getAttribute("data-lng"));
+  document
+    .querySelectorAll(".location_block_result_item_wrap")
+    .forEach((item) => {
+      const rawName = item.getAttribute("data-name");
+      const name = rawName?.trim();
+      const lat = Number.parseFloat(item.getAttribute("data-lat"));
+      const lng = Number.parseFloat(item.getAttribute("data-lng"));
 
-    // Skip empty/placeholder rows. Treat a missing name, blank string, or the
-    // literal "null"/"undefined" text as invalid (a real CMS record with an
-    // unbound Name field renders `data-name="null"`), and require real coords.
-    const invalidName =
-      !name || name.toLowerCase() === "null" || name.toLowerCase() === "undefined";
-    if (invalidName || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      mapLogger.warn("Skipping location with missing data:", {
-        name: rawName,
-        lat,
-        lng,
-      });
-      return;
-    }
-
-    const uniqueKey = `${name}_${lat}_${lng}`;
-
-    if (!window.locationData.some((entry) => entry.uniqueKey === uniqueKey)) {
-      let imageUrl = item.querySelector("img")?.getAttribute("src") || "";
-
-      if (!imageUrl || imageUrl.trim() === "" || imageUrl === invalidPlaceholder) {
-        imageUrl = fallbackUrl;
+      // Skip empty/placeholder rows. Treat a missing name, blank string, or the
+      // literal "null"/"undefined" text as invalid (a real CMS record with an
+      // unbound Name field renders `data-name="null"`), and require real coords.
+      const invalidName =
+        !name ||
+        name.toLowerCase() === "null" ||
+        name.toLowerCase() === "undefined";
+      if (invalidName || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        mapLogger.warn("Skipping location with missing data:", {
+          name: rawName,
+          lat,
+          lng,
+        });
+        return;
       }
 
-      window.locationData.push({
-        uniqueKey,
-        name,
-        lat,
-        lng,
-        imageUrl,
-        link: item.getAttribute("data-link")
-          ? `/location/${item.getAttribute("data-link")}`
-          : "",
-        country: item.getAttribute("data-country") || "",
-        state: item.getAttribute("data-state") || "",
-        city: item.getAttribute("data-city") || "",
-        postcodes: item.getAttribute("data-postcode") || "",
-        stateISO: item.getAttribute("data-state-iso") || "",
-      });
-    }
-  });
+      const uniqueKey = `${name}_${lat}_${lng}`;
+
+      if (!window.locationData.some((entry) => entry.uniqueKey === uniqueKey)) {
+        let imageUrl = item.querySelector("img")?.getAttribute("src") || "";
+
+        if (
+          !imageUrl ||
+          imageUrl.trim() === "" ||
+          imageUrl === invalidPlaceholder
+        ) {
+          imageUrl = fallbackUrl;
+        }
+
+        window.locationData.push({
+          uniqueKey,
+          name,
+          lat,
+          lng,
+          imageUrl,
+          link: item.getAttribute("data-link")
+            ? `/location/${item.getAttribute("data-link")}`
+            : "",
+          country: item.getAttribute("data-country") || "",
+          state: item.getAttribute("data-state") || "",
+          city: item.getAttribute("data-city") || "",
+          postcodes: item.getAttribute("data-postcode") || "",
+          stateISO: item.getAttribute("data-state-iso") || "",
+        });
+      }
+    });
 
   try {
-    sessionStorage.setItem(LOCATION_DATA_KEY, JSON.stringify(window.locationData));
+    sessionStorage.setItem(
+      LOCATION_DATA_KEY,
+      JSON.stringify(window.locationData),
+    );
     sessionStorage.setItem(LOCATION_DATA_TIMESTAMP_KEY, Date.now().toString());
   } catch (e) {
     mapLogger.warn("sessionStorage save failed:", e);
@@ -274,7 +287,8 @@ document.addEventListener("DOMContentLoaded", () => {
       script.async = true;
       script.defer = true;
       script.onload = resolve;
-      script.onerror = () => reject(new Error("Google Maps API failed to load"));
+      script.onerror = () =>
+        reject(new Error("Google Maps API failed to load"));
       document.head.appendChild(script);
     });
   }
@@ -410,8 +424,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function buildLocationCard(marker, showDistance = false) {
-    const { name, link, imageUrl, distance, country, state, city, postcodes, stateISO } =
-      marker.extraData;
+    const {
+      name,
+      link,
+      imageUrl,
+      distance,
+      country,
+      state,
+      city,
+      postcodes,
+      stateISO,
+    } = marker.extraData;
 
     const heroItem = document.createElement("a");
     heroItem.classList.add("location_hero_item");
@@ -420,12 +443,18 @@ document.addEventListener("DOMContentLoaded", () => {
     heroItem.setAttribute("n4-filter-name", name ? name.toLowerCase() : "");
     heroItem.setAttribute("n4-filter-city", city ? city.toLowerCase() : "");
     heroItem.setAttribute("n4-filter-state", state ? state.toLowerCase() : "");
-    heroItem.setAttribute("n4-filter-country", country ? country.toLowerCase() : "");
+    heroItem.setAttribute(
+      "n4-filter-country",
+      country ? country.toLowerCase() : "",
+    );
     heroItem.setAttribute(
       "n4-filter-postcodes",
       postcodes ? postcodes.toLowerCase() : "",
     );
-    heroItem.setAttribute("n4-filter-stateISO", stateISO ? stateISO.toLowerCase() : "");
+    heroItem.setAttribute(
+      "n4-filter-stateISO",
+      stateISO ? stateISO.toLowerCase() : "",
+    );
 
     heroItem.innerHTML = `
       <div class="location_hero_item_image_wrap">
@@ -445,7 +474,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateMarkersList() {
-    if (!window.map || !window.markers || !heroListElem || !resultCountElem) return;
+    if (!window.map || !window.markers || !heroListElem || !resultCountElem)
+      return;
 
     const bounds = window.map.getBounds();
     if (!bounds) return;
@@ -544,7 +574,7 @@ document.addEventListener("DOMContentLoaded", () => {
       mapTypeId: "roadmap",
       zoom: 12,
       gestureHandling: window.innerWidth <= 425 ? "greedy" : "auto",
-      clickableIcons: false, // Suppress Google's default POI/place info window on clicks
+      clickableIcons: false, // Suppress Google's default POI's
       disableDefaultUI: true,
       zoomControl: true,
       streetViewControl: false,
