@@ -159,6 +159,21 @@ function getUserECIDAsync(maxWaitMs = 5000, pollIntervalMs = 100) {
   });
 }
 
+// Build page name based of what site we are on
+function getAnalyticsSiteName() {
+  return location.hostname.endsWith(".edu")
+    ? "cedars-sinai-edu"
+    : "cedars-sinai";
+}
+
+function getAnalyticsPagePath() {
+  return location.pathname
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => segment.split('.')[0])
+    .join(':');
+}
+
 // Track page views for non-article detail pages
 if (!isArticleDetail()) {
   window.adobeDataLayer = window.adobeDataLayer || [];
@@ -180,8 +195,13 @@ if (!isArticleDetail()) {
         pageURL: location.href,
         refURL: document.referrer || "",
       },
-      pageName:
-        "cs-org:cedars-sinai:" + location.pathname.substring(1).replaceAll("/", ":").split(".")[0],
+      pageName: [
+        'cs-org',
+        getAnalyticsSiteName(),
+        getAnalyticsPagePath(),
+      ]
+        .filter(Boolean)
+        .join(':'),
       pageTitle: (() => {
         const h1 = document.querySelector("h1");
         return h1 ? toPlainLower(h1.textContent) : toPlainLower(document.title);
