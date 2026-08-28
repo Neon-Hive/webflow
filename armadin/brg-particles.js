@@ -1002,6 +1002,7 @@
     var st = document.createElement("style");
     st.id = ID;
     st.textContent =
+      "[data-brg-copy]{display:none !important}" +
       "[data-particles] > canvas{display:block;width:100%;height:100%}" +
       "[data-particles] .brg-textlayer{position:absolute;inset:0;pointer-events:none;" +
       "display:grid;place-items:center;overflow:hidden;" +
@@ -1009,6 +1010,14 @@
       "[data-particles] .brg-text{grid-area:1/1;width:100%;height:auto;max-width:none;" +
       "opacity:0;will-change:opacity,transform}";
     mount.appendChild(st);
+  })();
+
+  (function hideCopyBlocks() {
+    var all = document.querySelectorAll("[data-brg-copy]"), i;
+    for (i = 0; i < all.length; i++) {
+      if (all[i].tagName === "SCRIPT") continue;
+      try { all[i].style.setProperty("display", "none", "important"); } catch (e) {}
+    }
   })();
 
   var textLayer = document.createElement("div");
@@ -1477,12 +1486,12 @@
   var HYST = num(d.textHyst, 0.02);
 
   var BEAT = {
-    outA: [num(d.beatOutA0, 0.24), num(d.beatOutA1, 0.36)],
-    red:  [num(d.beatRed0,  0.26), num(d.beatRed1,  0.48)],
-    inB:  [num(d.beatInB0,  0.32), num(d.beatInB1,  0.42)],
-    outB: [num(d.beatOutB0, 0.88), num(d.beatOutB1, 0.94)],
-    zoom: [num(d.beatZoom0, 0.88), num(d.beatZoom1, 1.00)],
-    exit: [num(d.beatExit0, 0.88), num(d.beatExit1, 1.00)],
+    outA: [num(d.beatOutA0, 0.20), num(d.beatOutA1, 0.30)],
+    red:  [num(d.beatRed0,  0.24), num(d.beatRed1,  0.46)],
+    inB:  [num(d.beatInB0,  0.28), num(d.beatInB1,  0.38)],
+    outB: [num(d.beatOutB0, 0.85), num(d.beatOutB1, 0.91)],
+    zoom: [num(d.beatZoom0, 0.85), num(d.beatZoom1, 1.00)],
+    exit: [num(d.beatExit0, 0.85), num(d.beatExit1, 1.00)],
   };
 
   function above(cur, p, mark) {
@@ -1832,7 +1841,21 @@
     tick(now);
   }
 
+  var wasOff = null;
+  function clipOffscreen() {
+    var r;
+    try { r = host.getBoundingClientRect(); } catch (e) { return; }
+    var vh = window.innerHeight || 0, vw = window.innerWidth || 0;
+    var off = r.bottom <= 0 || r.top >= vh || r.right <= 0 || r.left >= vw;
+    if (off === wasOff) return;
+    wasOff = off;
+    var v = off ? "hidden" : "";
+    textLayer.style.visibility = v;
+    canvas.style.visibility = v;
+  }
+
   function tick(now) {
+    clipOffscreen();
     if (lastNow) fps = fps * 0.9 + (1000 / Math.max(1, now - lastNow)) * 0.1;
     lastNow = now;
 
