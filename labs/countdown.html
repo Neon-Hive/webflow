@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASCII Teaser</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; touch-action: none; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  .mono { font-family: 'Cascadia Mono', Consolas, monospace; user-select: none; }
+  #mode { position: fixed; top: 18px; right: 18px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; background: none; border: 1px solid; font-size: 16px; line-height: 1; cursor: pointer; padding: 0; }
+  #label, #hint { position: fixed; bottom: 16px; font-size: 11px; letter-spacing: 2px; opacity: .45; pointer-events: none; }
+  #label { left: 18px; }
+  #hint { right: 18px; }
+  @media (max-width: 560px) { #hint { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="mode" title="light / dark">&#9680;</button>
+<div id="label" class="mono">ASCII TEASER</div>
+<div id="hint" class="mono">MOVE TO STIR</div>
+<script>
+// ---- CONFIG ----
+const AHEAD_DAYS = 3; // demo: always counts to midnight this many days out
+const LOGO = 'N4';
+const LOGO_FONT = "800 100px 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const RAMP = ' .:-=+*#%@';
+const FONT_PX = 12;
+const CELL_W = 9;
+const CELL_H = 14;
+const LEVELS = 32;
+const FLOOR = 0.07;
+const PHASES = { gather: 8, hold: 4.5, burst: 2.2, drift: 4 };
+const DECAY = 0.995;
+const VEL_DAMP = 0.985;
+const ITER = 6;
+const EMITTERS = 5;
+const EMIT_DYE = 0.08;
+const SMOKE_CAP = 0.6;
+const EMIT_FORCE = 0.2;
+const WIND = 0.012;
+const ATTRACT = 0.55;
+const RELAX = 0.12;
+const CLEAR = 0.012;
+const BURST_FORCE = 0.7;
+const STIR_FORCE = 0.22;
+const STIR_DYE = 0.9;
+const THEMES = {
+  dark:  { bg: '#0a0a0a', fg: '#e8e6e1', ui: 'rgba(232,230,225,.75)' },
+  light: { bg: '#edeae3', fg: '#14120f', ui: 'rgba(20,18,15,.7)' }
+};
+let theme = THEMES.dark;
+// ----------------
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const modeBtn = document.getElementById('mode');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const target = new Date();
+target.setHours(0, 0, 0, 0);
+target.setDate(target.getDate() + AHEAD_DAYS);
+const pad = n => String(n).padStart(2, '0');
+const LAUNCH_LINE = `LAUNCHING ${pad(target.getDate())}.${pad(target.getMonth() + 1)}.${pad(target.getFullYear() % 100)}`;
+const MONO = px => `${px}px 'Cascadia Mono', Consolas, monospace`;
+const clamp = (a, lo, hi) => a < lo ? lo : a > hi ? hi : a;
+const smooth = t => t * t * (3 - 2 * t);
+if (reduce) document.getElementById('hint').style.display = 'none';
+
+const P = new Uint8Array(512);
+{
+  const p = new Uint8Array(256).map((_, i) => i);
+  for (let i = 255; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) P[i] = p[i & 255];
+}
+const hash = (x, y) => P[(P[x & 255] + y) & 255] / 255;
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+let CW, CH, FPX, vw, vh, dpr, COLS, ROWS, N, ox, oy, colX, rowY, sw, sh;
+let d, u, v, u0, v0, au, av, p, div, M, G, gx, gy, tex, shade, bu, bv, wu, wv;
+let texts = [];
+const ix = (x, y) => x + y * COLS;
+
+function buildMask(top, logoH) {
+  const SS = 3, mw = COLS * SS, mh = ROWS * SS;
+  const mc = document.createElement('canvas');
+  mc.width = mw; mc.height = mh;
+  const m = mc.getContext('2d', { willReadFrequently: true });
+  m.font = LOGO_FONT;
+  const met = m.measureText(LOGO);
+  const capH = met.actualBoundingBoxAscent + met.actualBoundingBoxDescent;
+  const scale = Math.min(logoH / capH, vw * 0.84 / met.width);
+  const gw = COLS * CW;
+  m.setTransform(SS / CW * scale, 0, 0, SS / CH * scale, 0, 0);
+  m.fillStyle = '#fff';
+  m.textAlign = 'center';
+  m.textBaseline = 'alphabetic';
+  m.fillText(LOGO, gw / 2 / scale, (top + (logoH + capH * scale) / 2) / scale - met.actualBoundingBoxDescent);
+  const px = m.getImageData(0, 0, mw, mh).data;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    let s = 0;
+    for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) s += px[((y * SS + sy) * mw + x * SS + sx) * 4 + 3];
+    M[ix(x, y)] = s / (SS * SS * 255);
+  }
+
+  G.set(M);
+  const tmp = new Float32Array(N);
+  for (let pass = 0; pass < 4; pass++) {
+    const r = 4;
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      let s = 0, c = 0;
+      for (let k = -r; k <= r; k++) { const xx = x + k; if (xx >= 0 && xx < COLS) { s += G[ix(xx, y)]; c++; } }
+      tmp[ix(x, y)] = s / c;
+    }
+    const ry = Math.max(1, Math.round(r * CW / CH));
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      let s = 0, c = 0;
+      for (let k = -ry; k <= ry; k++) { const yy = y + k; if (yy >= 0 && yy < ROWS) { s += tmp[ix(x, yy)]; c++; } }
+      G[ix(x, y)] = s / c;
+    }
+  }
+  let gmax = 1e-6;
+  for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+    const i = ix(x, y);
+    gx[i] = G[i + 1] - G[i - 1];
+    gy[i] = (G[i + COLS] - G[i - COLS]) * CW / CH;
+    gmax = Math.max(gmax, Math.hypot(gx[i], gy[i]));
+  }
+  for (let i = 0; i < N; i++) {
+    const g = Math.hypot(gx[i], gy[i]);
+    if (g > 0) { const k = Math.sqrt(g / gmax) / g; gx[i] *= k; gy[i] *= k; }
+  }
+}
+
+function layout() {
+  const logoH = Math.min(vh * 0.36, vw * 0.6);
+  const textRows = 6;
+  const blockH = logoH + textRows * CH;
+  const top = Math.max(CH * 2, (vh - blockH) / 2 - vh * 0.03) - oy / dpr;
+  buildMask(top, logoH);
+  const r0 = Math.round((top + logoH) / CH) + 2;
+  const line = (row, str, alpha) => ({ row, col: Math.floor((COLS - str.length) / 2), str, alpha });
+  texts = [line(r0, LAUNCH_LINE, 0.75), line(r0 + 2, '00:00:00:00', 1), line(r0 + 3, 'DD HH MM SS', 0.32)];
+
+  const x0 = texts[0].col - 3, x1 = texts[0].col + LAUNCH_LINE.length + 3, y0 = r0 - 1, y1 = r0 + 4;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const nx = (x + 0.5) / COLS * 2 - 1, ny = (y + 0.5) / ROWS * 2 - 1;
+    const vig = 1 - smooth(clamp((Math.hypot(nx * 0.85, ny) - 0.55) / 0.6, 0, 1));
+    const dx = Math.max(x0 - x, 0, x - x1) / 3, dy = Math.max(y0 - y, 0, y - y1) / 1.5;
+    const quiet = 0.08 + 0.92 * smooth(clamp(Math.hypot(dx, dy), 0, 1));
+    shade[ix(x, y)] = vig * quiet;
+    tex[ix(x, y)] = vnoise(x * 0.35, y * 0.5);
+  }
+}
+
+function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  vw = innerWidth; vh = innerHeight;
+  const cellScale = clamp(vw / 900, 0.78, 1);
+  CW = CELL_W * cellScale; CH = CELL_H * cellScale; FPX = FONT_PX * cellScale;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  COLS = Math.floor(vw / CW); ROWS = Math.floor(vh / CH); N = COLS * ROWS;
+  ox = Math.round((cv.width - COLS * CW * dpr) / 2);
+  oy = Math.round((cv.height - ROWS * CH * dpr) / 2);
+  colX = Float32Array.from({ length: COLS }, (_, x) => Math.round(ox + x * CW * dpr));
+  rowY = Float32Array.from({ length: ROWS }, (_, y) => Math.round(oy + y * CH * dpr));
+  [d, u, v, u0, v0, au, av, p, div, M, G, gx, gy, tex, shade, bu, bv, wu, wv] = Array.from({ length: 19 }, () => new Float32Array(N));
+  layout();
+  buildAtlas();
+  if (reduce) { paintStatic(); return; }
+  for (let k = 0; k < WARMUP; k++) step();
+}
+
+let atlas;
+function buildAtlas() {
+  sw = Math.ceil(CW * dpr); sh = Math.ceil(CH * dpr);
+  atlas = document.createElement('canvas');
+  atlas.width = sw * LEVELS; atlas.height = sh;
+  const a = atlas.getContext('2d');
+  a.font = MONO(FPX * dpr);
+  a.textAlign = 'center'; a.textBaseline = 'middle';
+  a.fillStyle = theme.fg;
+  for (let k = 1; k < LEVELS; k++) {
+    const t = k / (LEVELS - 1);
+    a.globalAlpha = 0.12 + 0.88 * Math.pow(t, 1.2);
+    a.fillText(RAMP[clamp(Math.round(t * (RAMP.length - 1)), 1, RAMP.length - 1)], sw * k + sw / 2, sh / 2);
+  }
+}
+
+function advect(dst, src, U, V) {
+  for (let y = 1; y < ROWS - 1; y++) {
+    for (let x = 1; x < COLS - 1; x++) {
+      const i = ix(x, y);
+      const px = clamp(x - U[i], 0.5, COLS - 1.5), py = clamp(y - V[i], 0.5, ROWS - 1.5);
+      const x0 = px | 0, y0 = py | 0, fx = px - x0, fy = py - y0, j = ix(x0, y0);
+      dst[i] = (src[j] * (1 - fx) + src[j + 1] * fx) * (1 - fy) + (src[j + COLS] * (1 - fx) + src[j + COLS + 1] * fx) * fy;
+    }
+  }
+}
+
+function project() {
+  for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+    const i = ix(x, y);
+    div[i] = -0.5 * (u[i + 1] - u[i - 1] + v[i + COLS] - v[i - COLS]);
+    p[i] = 0;
+  }
+  for (let k = 0; k < ITER; k++) for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+    const i = ix(x, y);
+    p[i] = (div[i] + p[i - 1] + p[i + 1] + p[i - COLS] + p[i + COLS]) * 0.25;
+  }
+  for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+    const i = ix(x, y);
+    u[i] -= 0.5 * (p[i + 1] - p[i - 1]);
+    v[i] -= 0.5 * (p[i + COLS] - p[i - COLS]);
+  }
+}
+
+const CYCLE = PHASES.gather + PHASES.hold + PHASES.burst + PHASES.drift;
+const WARMUP = 240;
+let simT = CYCLE - 1.5 - WARMUP / 60, burstCycle = -1, windStep = 0;
+
+function phase(t) {
+  const c = t % CYCLE;
+  if (c < PHASES.gather) return { s: smooth(c / PHASES.gather) ** 1.5, b: 0 };
+  if (c < PHASES.gather + PHASES.hold) return { s: 1, b: 0 };
+  const bt = c - PHASES.gather - PHASES.hold;
+  if (bt < PHASES.burst) return { s: 0, b: (1 - bt / PHASES.burst) ** 2 };
+  return { s: 0, b: 0 };
+}
+
+function curl(psiAt, ou, ov) {
+  const psi = new Float32Array(N);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) psi[ix(x, y)] = psiAt(x, y, ix(x, y));
+  for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
+    const i = ix(x, y);
+    ou[i] = (psi[i + COLS] - psi[i - COLS]) * 0.5;
+    ov[i] = -(psi[i + 1] - psi[i - 1]) * 0.5;
+  }
+}
+const buildBurst = seed => curl((x, y, i) => (G[i] * 1.6 + 0.05) * (vnoise(x * 0.16 + seed * 7.1, y * 0.24 + seed * 3.3) - 0.5) * 12, bu, bv);
+const buildWind = t => curl((x, y) => vnoise(x * 0.045 + t * 0.05, y * 0.07 - t * 0.04 + 40) * 30, wu, wv);
+
+function splat(cx, cy, fx, fy, dye, rx, ry, cap) {
+  const x0 = Math.max(1, Math.floor(cx - rx)), x1 = Math.min(COLS - 2, Math.ceil(cx + rx));
+  const y0 = Math.max(1, Math.floor(cy - ry)), y1 = Math.min(ROWS - 2, Math.ceil(cy + ry));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const dx = (x - cx) / rx, dy = (y - cy) / ry, w = Math.exp(-2.5 * (dx * dx + dy * dy));
+    const i = ix(x, y);
+    u[i] += fx * w; v[i] += fy * w; d[i] += dye * w * Math.max(0, 1 - d[i] / cap);
+  }
+}
+
+const mouse = { x: -1, y: -1, px: -1, py: -1, moved: false };
+function pointer(cx, cy) {
+  const x = (cx * dpr - ox) / (CW * dpr), y = (cy * dpr - oy) / (CH * dpr);
+  if (mouse.x < 0) { mouse.px = x; mouse.py = y; }
+  mouse.x = x; mouse.y = y; mouse.moved = true;
+}
+addEventListener('pointermove', e => pointer(e.clientX, e.clientY));
+addEventListener('pointerleave', () => { mouse.x = -1; });
+
+function step() {
+  const t = simT;
+  simT += 1 / 60;
+  const { s, b } = phase(t);
+  const ambient = 1 - 0.55 * s;
+  if (windStep-- <= 0) { windStep = 8; buildWind(t); }
+  for (let i = 0; i < N; i++) { u[i] += wu[i] * WIND; v[i] += wv[i] * WIND; }
+
+  for (let k = 0; k < EMITTERS; k++) {
+    const ex = COLS * (0.5 + 1.25 * (vnoise(t * 0.06 + k * 13.7, k * 5.1) - 0.5));
+    const ey = ROWS * (0.5 + 1.25 * (vnoise(k * 9.3, t * 0.05 + k * 21.9) - 0.5));
+    const a = vnoise(t * 0.07, k * 31.7 + 5) * Math.PI * 6;
+    splat(ex, ey, Math.cos(a) * EMIT_FORCE, Math.sin(a) * EMIT_FORCE * CW / CH, EMIT_DYE * ambient, 5, 3.5, SMOKE_CAP);
+  }
+
+  if (b > 0) {
+    const cyc = Math.floor(t / CYCLE);
+    if (cyc !== burstCycle) { burstCycle = cyc; buildBurst(cyc + Math.random()); }
+    const k = BURST_FORCE * b / 60 * 4;
+    for (let i = 0; i < N; i++) { u[i] += bu[i] * k; v[i] += bv[i] * k; }
+  }
+
+  if (mouse.moved && mouse.x >= 0) {
+    const fx = (mouse.x - mouse.px) * STIR_FORCE, fy = (mouse.y - mouse.py) * STIR_FORCE;
+    const sp = Math.min(1, Math.hypot(fx, fy));
+    splat(mouse.x, mouse.y, fx, fy, STIR_DYE * sp, 3, 2, 1);
+    mouse.px = mouse.x; mouse.py = mouse.y; mouse.moved = false;
+  }
+
+  u0.set(u); v0.set(v);
+  advect(u, u0, u0, v0);
+  advect(v, v0, u0, v0);
+  project();
+
+  const pull = ATTRACT * s;
+  for (let i = 0; i < N; i++) { au[i] = u[i] + gx[i] * pull; av[i] = v[i] + gy[i] * pull; }
+  u0.set(d);
+  advect(d, u0, au, av);
+
+  const relax = RELAX * s, clear = CLEAR * s, still = 0.12 * s;
+  for (let i = 0; i < N; i++) {
+    const m = M[i];
+    let dv = d[i] * DECAY;
+    if (s > 0) {
+      if (m > 0.02) dv += (m * (0.92 + 0.3 * tex[i]) - dv) * relax * m;
+      else dv -= dv * clear;
+    }
+    d[i] = dv > 1.4 ? 1.4 : dv;
+    const damp = VEL_DAMP * (1 - still * m);
+    u[i] *= damp; v[i] *= damp;
+  }
+}
+
+function countdown() {
+  let s = Math.max(0, Math.floor((target - Date.now()) / 1000));
+  const dd = Math.floor(s / 86400); s %= 86400;
+  return `${pad(dd)}:${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+}
+
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < ROWS; y++) {
+    const py = rowY[y];
+    for (let x = 0, i = y * COLS; x < COLS; x++, i++) {
+      const k = ((d[i] * shade[i] - FLOOR) * LEVELS / (1 - FLOOR)) | 0;
+      if (k < 1) continue;
+      ctx.drawImage(atlas, (k < LEVELS ? k : LEVELS - 1) * sw, 0, sw, sh, colX[x], py, sw, sh);
+    }
+  }
+  texts[1].str = countdown();
+  ctx.font = MONO(FPX * dpr);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = theme.fg;
+  for (const { row, col, str, alpha } of texts) {
+    if (row < 0 || row >= ROWS) continue;
+    ctx.globalAlpha = alpha;
+    for (let j = 0; j < str.length; j++) {
+      const x = col + j;
+      if (str[j] !== ' ' && x >= 0 && x < COLS) ctx.fillText(str[j], colX[x] + sw / 2, rowY[row] + sh / 2);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function paintStatic() {
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const i = ix(x, y);
+    const smoke = Math.max(0, vnoise(x * 0.06, y * 0.11) * 0.7 + vnoise(x * 0.17, y * 0.3) * 0.3 - 0.45) * 0.9;
+    d[i] = Math.max(M[i] * (0.8 + 0.22 * tex[i]), smoke);
+  }
+  draw();
+}
+
+let last = performance.now(), acc = 0;
+function frame(now) {
+  acc = Math.min(acc + (now - last) / 1000, 3 / 60);
+  last = now;
+  while (acc >= 1 / 60) { step(); acc -= 1 / 60; }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+function applyTheme() {
+  document.body.style.background = theme.bg;
+  document.body.style.color = theme.fg;
+  modeBtn.style.color = modeBtn.style.borderColor = theme.ui;
+  buildAtlas();
+  if (reduce) draw();
+}
+modeBtn.addEventListener('click', () => { theme = theme === THEMES.dark ? THEMES.light : THEMES.dark; applyTheme(); });
+
+let resizeTimer;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 120); });
+resize();
+applyTheme();
+if (reduce) setInterval(draw, 1000);
+else requestAnimationFrame(t => { last = t; frame(t); });
+</script>
+</body>
+</html>
