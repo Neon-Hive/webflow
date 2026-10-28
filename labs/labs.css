@@ -1,0 +1,7 @@
+/* Live lab popup: 16:9 stage centered, kept clear of the 3-col description on both sides */
+.lab-card_popup_wrap[data-lab-layout="embed"] .lab-card_popup_content { container-type: size; }
+.lab-card_popup_wrap[data-lab-layout="embed"] .lab-card_popup_visual { height: auto; aspect-ratio: 16 / 9; }
+.lab-card_popup_wrap[data-lab-layout="embed"] [data-lab-stage] { inset: 0; margin: auto; width: min(100cqw - 2 * (var(--column-width--3) + var(--site--gutter)), 100cqh * 16 / 9); }
+@media (max-width: 767px) {
+  .lab-card_popup_wrap[data-lab-layout="embed"] [data-lab-stage] { inset: auto; margin: 0; width: 100%; aspect-ratio: auto; height: 60vh; }
+}
