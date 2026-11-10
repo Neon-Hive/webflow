@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halftone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;900&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: none; touch-action: none; }
+  #mode { position: fixed; top: 18px; right: 18px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; background: none; border: 1px solid; font-size: 16px; line-height: 1; cursor: pointer; padding: 0; }
+  .ui { position: fixed; bottom: 16px; font: 11px 'Cascadia Mono', Consolas, monospace; letter-spacing: 2px; opacity: .45; pointer-events: none; user-select: none; }
+  #label { left: 18px; }
+  #hint { right: 18px; white-space: pre; opacity: .7; }
+  @media (max-width: 640px) { #hint { bottom: 34px; left: 18px; right: auto; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="mode" title="light / dark">&#9680;</button>
+<div class="ui" id="label">HALFTONE</div>
+<div class="ui" id="hint">CLICK FOR A NEW PRINT  ·  S SAVE PNG</div>
+<script>
+// ---- CONFIG ----
+const RATIO = Math.SQRT2;
+const FILL = 0.86;
+const FONT = '"Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif';
+const PITCHES = [14, 16, 18];
+const ANGLES = [[45, 15], [45, 75], [15, 75], [75, 15], [0, 45]];
+const SHAPES = ['circle', 'circle', 'square', 'line'];
+const SRC_SCALE = 0.5;
+const BREATH = 0.1, SWEEP = 0.2, SWEEP_SPEED = 70, SWEEP_WIDTH = 170;
+const LENS_R = 160, LENS_MAG = 1.9;
+const TRANS = 1100;
+const EXPORT_W = 2480;
+const THEMES = {
+  dark:  { bg: '#0a0a0a', fg: '#e8e6e1', paper: '#161513', accent: '#ff3b1f', blend: 'screen', ui: 'rgba(232,230,225,.75)' },
+  light: { bg: '#edeae3', fg: '#14120f', paper: '#f8f6f0', accent: '#ff3b1f', blend: 'multiply', ui: 'rgba(20,18,15,.7)' }
+};
+let theme = THEMES.dark;
+// ----------------
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const mctx = document.createElement('canvas').getContext('2d');
+const modeBtn = document.getElementById('mode');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const PW = 1000, PH = PW * RATIO, M = 64;
+const RULE_Y = PH - M - 92;
+
+function rng(a) {
+  return () => {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function fitText(c, str, weight, x, y, w) {
+  mctx.font = `${weight} 100px ${FONT}`;
+  const mt = mctx.measureText(str);
+  const k = w / (mt.actualBoundingBoxLeft + mt.actualBoundingBoxRight);
+  c.font = `${weight} ${100 * k}px ${FONT}`;
+  c.fillText(str, x + mt.actualBoundingBoxLeft * k, y + mt.actualBoundingBoxAscent * k);
+  return (mt.actualBoundingBoxAscent + mt.actualBoundingBoxDescent) * k;
+}
+
+function glyphHeight(str, weight, w) {
+  mctx.font = `${weight} 100px ${FONT}`;
+  const mt = mctx.measureText(str);
+  return (mt.actualBoundingBoxAscent + mt.actualBoundingBoxDescent) * w / (mt.actualBoundingBoxLeft + mt.actualBoundingBoxRight);
+}
+
+function tone(c, kind, x0, y0, x1, y1, from, to) {
+  if (kind === 'solid') return `rgba(255,255,255,${from})`;
+  const gr = kind === 'v' ? c.createLinearGradient(0, y0, 0, y1) : c.createLinearGradient(x0, 0, x1, 0);
+  gr.addColorStop(0, `rgba(255,255,255,${from})`);
+  gr.addColorStop(1, `rgba(255,255,255,${to})`);
+  return gr;
+}
+
+function compose(seed) {
+  const R = rng(seed);
+  const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
+  const pick = a => a[Math.floor(R() * a.length)];
+  const layout = pick(['top', 'bottom', 'vertical', 'bleed']);
+  const glyphFill = pick(['solid', 'solid', 'v', 'h']);
+  const discFill = pick(['radial', 'radial', 'solid', 'ring', 'inverse']);
+  const band = R() < 0.45;
+  const [aFg, aAc] = pick(ANGLES);
+  const pitch = pick(PITCHES), shape = pick(SHAPES);
+  const misreg = { x: (R() - 0.5) * 6, y: (R() - 0.5) * 6 };
+  const top = M + 44, bottom = RULE_Y - 36, cw = PW - 2 * M;
+  const d = new Date();
+  const date = [d.getDate(), d.getMonth() + 1, d.getFullYear() % 100].map(v => String(v).padStart(2, '0')).join('.');
+
+  let disc;
+  function drawGlyph(c) {
+    let x = M, y = top, w = cw, h;
+    if (layout === 'vertical') {
+      w = bottom - top;
+      h = glyphHeight('N4', 900, w);
+      c.save();
+      c.translate(M, bottom);
+      c.rotate(-Math.PI / 2);
+      c.fillStyle = tone(c, glyphFill, 0, 0, w, h, 1, 0.12);
+      fitText(c, 'N4', 900, 0, 0, w);
+      c.restore();
+      disc = { x: M + h + (PW - M - h - M) / 2 + ri(-40, 40), y: ri(top + 240, bottom - 240), r: ri(170, 230) };
+      return;
+    }
+    if (layout === 'bleed') { w = cw * 1.55; x = M - ri(0, 1) * cw * 0.55; }
+    h = glyphHeight('N4', 900, w);
+    if (layout === 'bottom') y = bottom - h;
+    if (layout === 'bleed') y = top + ri(80, Math.max(80, bottom - top - h - 40));
+    c.fillStyle = tone(c, glyphFill, x, y, x + w, y + h, 1, 0.12);
+    fitText(c, 'N4', 900, x, y, w);
+    const r = ri(190, 310);
+    const freeTop = layout === 'bottom';
+    disc = {
+      x: ri(M + r * 0.6, PW - M - r * 0.6),
+      y: freeTop ? ri(top + r * 0.8, Math.max(top + r * 0.8, y + h * 0.35)) : ri(Math.min(y + h * 0.6, bottom - r), bottom - r * 0.7),
+      r
+    };
+  }
+
+  function drawDisc(c) {
+    const { x, y, r } = disc;
+    c.beginPath();
+    if (discFill === 'ring') {
+      c.arc(x, y, r - 22, 0, Math.PI * 2);
+      c.lineWidth = 44;
+      c.strokeStyle = '#fff';
+      c.stroke();
+      return;
+    }
+    c.arc(x, y, r, 0, Math.PI * 2);
+    if (discFill === 'solid') c.fillStyle = '#fff';
+    else {
+      const gr = c.createRadialGradient(x - r * 0.25, y - r * 0.25, 0, x, y, r);
+      const [a, b] = discFill === 'radial' ? [1, 0.06] : [0.08, 1];
+      gr.addColorStop(0, `rgba(255,255,255,${a})`);
+      gr.addColorStop(1, `rgba(255,255,255,${b})`);
+      c.fillStyle = gr;
+    }
+    c.fill();
+  }
+
+  function drawBand(c) {
+    const h = ri(70, 150), y = ri(top + 40, bottom - h - 40), flip = R() < 0.5;
+    c.fillStyle = tone(c, 'h', 0, 0, PW, 0, flip ? 0 : 0.9, flip ? 0.9 : 0);
+    c.fillRect(0, y, PW, h);
+  }
+
+  const fgSrc = srcCanvas(), acSrc = srcCanvas();
+  const bandFirst = band && R() < 0.5;
+  drawGlyph(fgSrc);
+  drawDisc(acSrc);
+  if (band) drawBand(bandFirst ? acSrc : fgSrc);
+
+  const cols = [
+    ['N4 STUDIO', 'LAB — PRINT SERIES'],
+    [`SCREEN ${aFg}° / ${aAc}°`, `${shape.toUpperCase()} DOT · ${pitch} PT`],
+    [`PRINT ${seed}`, date]
+  ];
+  function register(c, dx, dy) {
+    const x = PW - M - 18 + dx, y = RULE_Y + 40 + dy;
+    c.beginPath();
+    c.arc(x, y, 11, 0, Math.PI * 2);
+    c.moveTo(x - 18, y); c.lineTo(x + 18, y);
+    c.moveTo(x, y - 18); c.lineTo(x, y + 18);
+    c.lineWidth = 1.2;
+    c.stroke();
+  }
+  function type(c) {
+    c.strokeStyle = theme.accent;
+    register(c, misreg.x, misreg.y);
+    c.strokeStyle = theme.fg;
+    register(c, 0, 0);
+    c.fillStyle = theme.fg;
+    c.fillRect(M, RULE_Y, PW - 2 * M, 1.5);
+    c.font = `500 14px ${FONT}`;
+    c.textBaseline = 'top';
+    cols.forEach((l, i) => l.forEach((s, j) => c.fillText(s, M + i * 230, RULE_Y + 24 + j * 18)));
+    c.fillText('HALFTONE STUDY', M, M);
+    c.textAlign = 'right';
+    c.fillText('EXP 009', PW - M, M);
+    c.textAlign = 'left';
+    c.textBaseline = 'alphabetic';
+  }
+
+  return {
+    seed, type, shape, pitch,
+    inks: [
+      screen(acSrc, aAc, pitch, misreg, 'accent', shape),
+      screen(fgSrc, aFg, pitch, { x: 0, y: 0 }, 'fg', shape)
+    ]
+  };
+}
+
+function srcCanvas() {
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(PW * SRC_SCALE); c.height = Math.ceil(PH * SRC_SCALE);
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.scale(SRC_SCALE, SRC_SCALE);
+  return x;
+}
+
+function screen(src, angle, p, off, ink, shape) {
+  const sw = src.canvas.width, sh = src.canvas.height;
+  const data = src.getImageData(0, 0, sw, sh).data;
+  const at = (x, y) => {
+    const ix = x * SRC_SCALE | 0, iy = y * SRC_SCALE | 0;
+    return ix < 0 || iy < 0 || ix >= sw || iy >= sh ? 0 : data[(iy * sw + ix) * 4 + 3];
+  };
+  const a = angle * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a);
+  const n = Math.ceil(Math.hypot(PW, PH) / 2 / p) + 1;
+  const xs = [], ys = [], cs = [], ws = [];
+  const q = p / 3;
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+    const x = PW / 2 + (i * ux - j * uy) * p, y = PH / 2 + (i * uy + j * ux) * p;
+    if (x < -p || y < -p || x > PW + p || y > PH + p) continue;
+    let s = 0;
+    for (let dy = -q; dy <= q; dy += q) for (let dx = -q; dx <= q; dx += q) s += at(x + dx, y + dy);
+    const c = s / 9 / 255;
+    if (c < 0.03) continue;
+    xs.push(x + off.x); ys.push(y + off.y); cs.push(c);
+    ws.push((x * 0.62 + y * 0.38) / (PW * 0.62 + PH * 0.38));
+  }
+  return { ink, shape, p, ux, uy, n: xs.length, x: Float32Array.from(xs), y: Float32Array.from(ys), c: Float32Array.from(cs), w: Float32Array.from(ws) };
+}
+
+const lens = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, on: false };
+
+function gain(x, y, t) {
+  if (reduce) return 1;
+  const n = Math.sin(x * 0.0055 + t * 0.38 + 1.8 * Math.sin(y * 0.0036 - t * 0.21));
+  const span = PW * 0.8 + PH * 0.6 + 2 * SWEEP_WIDTH * 2;
+  const pos = (t * SWEEP_SPEED) % span - SWEEP_WIDTH * 2;
+  const s = (x * 0.8 + y * 0.6 - pos) / SWEEP_WIDTH;
+  return 1 + BREATH * n + SWEEP * Math.exp(-s * s);
+}
+
+const ease = k => k * k * (3 - 2 * k);
+
+function drawInk(c, ink, t, phase, dir, lensAmt) {
+  const { p, ux, uy, x: X, y: Y, c: C, w: Wt, shape } = ink;
+  c.beginPath();
+  for (let i = 0; i < ink.n; i++) {
+    let x = X[i], y = Y[i], s = 1;
+    if (phase < 1) {
+      const v = ease(Math.min(1, Math.max(0, phase * 1.5 - Wt[i] * 0.5)));
+      s = dir > 0 ? v : 1 - v;
+      if (s <= 0.01) continue;
+    }
+    const g = gain(x, y, t);
+    const cov = Math.min(C[i] * g * g, 1.15);
+    let grow = 1;
+    if (lensAmt > 0.002) {
+      const dx = x - lens.x, dy = y - lens.y, d2 = dx * dx + dy * dy;
+      if (d2 < LENS_R * LENS_R) {
+        const u = Math.sqrt(d2) / LENS_R, m = 1 + (LENS_MAG - 1) * lensAmt, q = 1 + (m - 1) * u;
+        const f = m / q;
+        x = lens.x + dx * f; y = lens.y + dy * f;
+        grow = f / Math.sqrt(q);
+      }
+    }
+    if (shape === 'circle') {
+      const r = p * 0.56 * Math.sqrt(cov) * s * grow;
+      c.moveTo(x + r, y);
+      c.arc(x, y, r, 0, 6.2832);
+    } else {
+      const line = shape === 'line';
+      const hu = (line ? p * 0.52 : p * 0.44 * Math.sqrt(cov) * s) * grow;
+      const hv = line ? p * 0.42 * Math.min(cov, 1.05) * s * grow : hu;
+      const ax = ux * hu, ay = uy * hu, bx = -uy * hv, by = ux * hv;
+      c.moveTo(x - ax - bx, y - ay - by);
+      c.lineTo(x + ax - bx, y + ay - by);
+      c.lineTo(x + ax + bx, y + ay + by);
+      c.lineTo(x - ax + bx, y - ay + by);
+      c.closePath();
+    }
+  }
+  c.fillStyle = theme[ink.ink];
+  c.fill();
+}
+
+function paintPrint(c, print, t, phase, dir, lensAmt) {
+  c.save();
+  c.globalCompositeOperation = theme.blend;
+  for (const ink of print.inks) drawInk(c, ink, t, phase, dir, lensAmt);
+  c.globalAlpha = phase < 1 ? (dir > 0 ? ease(Math.min(1, phase * 1.4)) : 1 - ease(Math.min(1, phase * 1.6))) : 1;
+  print.type(c);
+  c.restore();
+}
+
+function paint(c, t, now, lensAmt) {
+  c.fillStyle = theme.paper;
+  c.fillRect(0, 0, PW, PH);
+  c.save();
+  c.beginPath(); c.rect(0, 0, PW, PH); c.clip();
+  const phase = reduce ? 1 : Math.min(1, (now - tStart) / TRANS);
+  if (prev && phase < 1) paintPrint(c, prev, t, phase, -1, lensAmt);
+  paintPrint(c, current, t, phase, 1, lensAmt);
+  c.restore();
+}
+
+function cropMarks(c, w, h) {
+  const g = 10, l = 16;
+  c.beginPath();
+  for (const [x, y, sx, sy] of [[0, 0, -1, -1], [w, 0, 1, -1], [0, h, -1, 1], [w, h, 1, 1]]) {
+    c.moveTo(x + sx * g, y); c.lineTo(x + sx * (g + l), y);
+    c.moveTo(x, y + sy * g); c.lineTo(x, y + sy * (g + l));
+  }
+  c.stroke();
+}
+
+let vw, vh, dpr, ox, oy, sc;
+function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  vw = innerWidth; vh = innerHeight;
+  cv.width = vw * dpr; cv.height = vh * dpr;
+  const ph = Math.min(vh * FILL, vw * FILL * RATIO);
+  sc = ph / PH;
+  ox = (vw - PW * sc) / 2; oy = (vh - ph) / 2;
+}
+addEventListener('resize', resize);
+resize();
+
+let current, prev, tStart = -Infinity;
+function next() {
+  prev = current;
+  current = compose(Math.floor(Math.random() * 900000) + 100000);
+  tStart = performance.now();
+}
+
+const ptr = { x: -1e4, y: -1e4 };
+function frame(now) {
+  const t = now / 1000;
+  lens.amt += ((lens.on ? 1 : 0) - lens.amt) * 0.1;
+  lens.x += (lens.tx - lens.x) * 0.22;
+  lens.y += (lens.ty - lens.y) * 0.22;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = theme.bg;
+  ctx.fillRect(0, 0, vw, vh);
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.strokeStyle = theme.ui;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 0.75;
+  cropMarks(ctx, PW * sc, PH * sc);
+  ctx.globalAlpha = 1;
+  ctx.scale(sc, sc);
+  paint(ctx, t, now, lens.amt);
+  ctx.restore();
+
+  if (ptr.x > -1e3) {
+    ctx.strokeStyle = ctx.fillStyle = theme.ui;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.35 * lens.amt;
+    ctx.beginPath();
+    ctx.arc(ox + lens.x * sc, oy + lens.y * sc, LENS_R * sc, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.arc(ptr.x, ptr.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (prev && now - tStart > TRANS) prev = null;
+  requestAnimationFrame(frame);
+}
+
+function save() {
+  const off = document.createElement('canvas');
+  off.width = EXPORT_W; off.height = Math.round(EXPORT_W * RATIO);
+  const c = off.getContext('2d');
+  c.scale(EXPORT_W / PW, EXPORT_W / PW);
+  const keep = prev; prev = null;
+  paint(c, performance.now() / 1000, Infinity, 0);
+  prev = keep;
+  off.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = `n4-lab-halftone-${current.seed}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+}
+
+function applyTheme() {
+  document.body.style.background = theme.bg;
+  modeBtn.style.color = modeBtn.style.borderColor = theme.ui;
+  document.querySelectorAll('.ui').forEach(el => el.style.color = theme.fg);
+}
+modeBtn.addEventListener('click', () => { theme = theme === THEMES.dark ? THEMES.light : THEMES.dark; applyTheme(); modeBtn.blur(); });
+applyTheme();
+
+function point(e) {
+  ptr.x = e.clientX; ptr.y = e.clientY;
+  lens.tx = (e.clientX - ox) / sc; lens.ty = (e.clientY - oy) / sc;
+  if (!lens.on) { lens.x = lens.tx; lens.y = lens.ty; }
+  lens.on = lens.tx > -LENS_R && lens.ty > -LENS_R && lens.tx < PW + LENS_R && lens.ty < PH + LENS_R;
+}
+cv.addEventListener('pointermove', point);
+cv.addEventListener('pointerdown', point);
+cv.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') { lens.on = false; ptr.x = -1e4; } });
+cv.addEventListener('pointerleave', () => { lens.on = false; ptr.x = -1e4; });
+cv.addEventListener('click', () => { if (current) next(); });
+addEventListener('keydown', e => {
+  if (e.key === 's' || e.key === 'S') save();
+  else if (e.code === 'Space') { e.preventDefault(); next(); }
+});
+
+const fontsReady = Promise.all([500, 900].map(w => document.fonts.load(`${w} 100px "Inter Tight"`))).catch(() => {});
+Promise.race([fontsReady, new Promise(r => setTimeout(r, 2500))]).then(() => {
+  next();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>
